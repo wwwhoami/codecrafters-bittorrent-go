@@ -14,9 +14,9 @@ import (
 // specified by the integer that precedes the string with a colon.
 // Example: 4:spam -> spam
 func decodeStr(r *bufio.Reader) (string, error) {
-	length, err := decodeInt(r, ':')
+	length, err := parseInt(r, ':')
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Invalid string length format: %v", err)
 	} else if length < 0 {
 		return "", fmt.Errorf("Invalid string length: %d", length)
 	}
@@ -36,24 +36,46 @@ func decodeStr(r *bufio.Reader) (string, error) {
 	return string(buf), nil
 }
 
-// decodeInt reads a number from the reader until the delimiter character is found.
+// parseInt reads a number from the reader until the delimiter character is found.
 // The delimiter character is not included in the returned string.
-// Example: i42e -> 42
-func decodeInt(r *bufio.Reader, delim byte) (int, error) {
+func parseInt(r *bufio.Reader, delim byte) (int, error) {
 	str, err := r.ReadString(delim)
 	if err != nil {
 		return 0, err
 	}
 	// Discard delim character
 	str = str[:len(str)-1]
-
 	return strconv.Atoi(str)
+}
+
+// decodeInt reads a number from the reader until the 'e' delimiter character is found.
+// The delimiter character is not included in the returned string.
+// Example: i42e -> 42
+func decodeInt(r *bufio.Reader) (int, error) {
+	if ch, _, err := r.ReadRune(); ch != 'i' {
+		return 0, fmt.Errorf("Integer should start with 'i' character")
+	} else if err != nil {
+		return 0, err
+	}
+
+	val, err := parseInt(r, 'e')
+	if err != nil {
+		return 0, fmt.Errorf("Invalid becoded integer: %v", err)
+	}
+
+	return val, nil
 }
 
 // decodeList reads a list from the reader until the 'e' character is found.
 // The 'e' character is not included in the returned list.
 // Example: l4:spam4:eggse -> ["spam", "eggs"]
 func decodeList(r *bufio.Reader) (list []interface{}, err error) {
+	if ch, _, err := r.ReadRune(); ch != 'l' {
+		return nil, fmt.Errorf("List should start with 'l' character")
+	} else if err != nil {
+		return nil, err
+	}
+
 	list = make([]interface{}, 0)
 
 	for {
@@ -64,7 +86,7 @@ func decodeList(r *bufio.Reader) (list []interface{}, err error) {
 
 		if ch[0] == 'e' {
 			// Discard 'e', proceeding reader by one byte
-			if _, err := r.ReadByte(); err != nil {
+			if _, err := r.Discard(1); err != nil {
 				return nil, err
 			}
 
@@ -83,6 +105,12 @@ func decodeList(r *bufio.Reader) (list []interface{}, err error) {
 }
 
 func decodeDict(r *bufio.Reader) (dict map[string]interface{}, err error) {
+	if ch, _, err := r.ReadRune(); ch != 'd' {
+		return nil, fmt.Errorf("Dictionary should start with 'd' character")
+	} else if err != nil {
+		return nil, err
+	}
+
 	dict = make(map[string]interface{})
 
 	for {
@@ -93,7 +121,7 @@ func decodeDict(r *bufio.Reader) (dict map[string]interface{}, err error) {
 
 		if ch[0] == 'e' {
 			// Discard 'e', proceeding reader by one byte
-			if _, err := r.ReadByte(); err != nil {
+			if _, err := r.Discard(1); err != nil {
 				return nil, err
 			}
 
@@ -118,21 +146,17 @@ func decodeDict(r *bufio.Reader) (dict map[string]interface{}, err error) {
 
 // decodeValue decodes a bencoded value from the reader.
 func decodeValue(r *bufio.Reader) (interface{}, error) {
-	firstCh, _, err := r.ReadRune()
+	ch, err := r.Peek(1)
 	if err != nil {
 		return nil, err
 	}
+	firstCh := ch[0]
 
 	switch {
-	case unicode.IsDigit(firstCh) || firstCh == '-':
-		// Unread first character to read the string
-		if err = r.UnreadRune(); err != nil {
-			return nil, err
-		}
-
+	case unicode.IsDigit(rune(firstCh)) || firstCh == '-':
 		return decodeStr(r)
 	case firstCh == 'i':
-		return decodeInt(r, 'e')
+		return decodeInt(r)
 	case firstCh == 'l':
 		return decodeList(r)
 	case firstCh == 'd':
