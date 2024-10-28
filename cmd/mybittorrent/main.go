@@ -5,35 +5,47 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"unicode"
 	// bencode "github.com/jackpal/bencode-go" // Available if you need it!
 )
 
-// Example:
-// - 5:hello -> hello
-// - 10:hello12345 -> hello12345
 func decodeBencode(bencodedString string) (interface{}, error) {
-	if unicode.IsDigit(rune(bencodedString[0])) {
-		var firstColonIndex int
+	firstCh := rune(bencodedString[0])
 
-		for i := 0; i < len(bencodedString); i++ {
-			if bencodedString[i] == ':' {
-				firstColonIndex = i
-				break
-			}
-		}
+	// Example:
+	// - 5:hello -> hello
+	// - 10:hello12345 -> hello12345
+	if unicode.IsDigit(firstCh) {
+		firstColonIdx := strings.Index(bencodedString, ":")
 
-		lengthStr := bencodedString[:firstColonIndex]
-
+		lengthStr := bencodedString[:firstColonIdx]
 		length, err := strconv.Atoi(lengthStr)
 		if err != nil {
 			return "", err
 		}
 
-		return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
-	} else {
-		return "", fmt.Errorf("Only strings are supported at the moment")
+		return bencodedString[firstColonIdx+1 : firstColonIdx+1+length], nil
+	} else if firstCh == 'i' {
+		// Example:
+		// - i123e -> 123
+		// - i-123e -> -123
+		endIntIndex := strings.Index(bencodedString, "e")
+
+		if endIntIndex == -1 {
+			return "", fmt.Errorf("Invalid integer")
+		}
+
+		numStr := bencodedString[1:endIntIndex]
+		num, err := strconv.Atoi(numStr)
+		if err != nil {
+			return "", err
+		}
+
+		return num, nil
 	}
+
+	return "", fmt.Errorf("Only strings are supported at the moment")
 }
 
 func main() {
