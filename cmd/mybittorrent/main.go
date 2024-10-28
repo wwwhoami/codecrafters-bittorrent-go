@@ -63,7 +63,7 @@ func decodeList(r *bufio.Reader) (list []interface{}, err error) {
 		}
 
 		if ch[0] == 'e' {
-			// Discard 'e'
+			// Discard 'e', proceeding reader by one byte
 			if _, err := r.ReadByte(); err != nil {
 				return nil, err
 			}
@@ -78,6 +78,41 @@ func decodeList(r *bufio.Reader) (list []interface{}, err error) {
 
 		list = append(list, value)
 	}
+
+	return
+}
+
+func decodeDict(r *bufio.Reader) (dict map[string]interface{}, err error) {
+	dict = make(map[string]interface{})
+
+	for {
+		ch, err := r.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if ch[0] == 'e' {
+			// Discard 'e', proceeding reader by one byte
+			if _, err := r.ReadByte(); err != nil {
+				return nil, err
+			}
+
+			break
+		}
+
+		key, err := decodeStr(r)
+		if err != nil {
+			return nil, err
+		}
+
+		value, err := decodeValue(r)
+		if err != nil {
+			return nil, err
+		}
+
+		dict[key] = value
+	}
+
 	return
 }
 
@@ -100,6 +135,8 @@ func decodeValue(r *bufio.Reader) (interface{}, error) {
 		return decodeInt(r, 'e')
 	case firstCh == 'l':
 		return decodeList(r)
+	case firstCh == 'd':
+		return decodeDict(r)
 	default:
 		return "", fmt.Errorf("Invalid data type: %c", firstCh)
 	}
