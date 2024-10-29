@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -216,11 +217,22 @@ func bencodeList(l []any) (string, error) {
 func bencodeDict(d map[string]any) (string, error) {
 	var res strings.Builder
 
+	// Sort keys to ensure deterministic output
+	// when encoding the dictionary
+	keys := make([]string, 0, len(d))
+
+	for k := range d {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
 	res.WriteString("d")
 
-	for k, v := range d {
+	for _, k := range keys {
 		res.WriteString(bencodeString(k))
 
+		v := d[k]
 		val, err := bencodeVal(v)
 		if err != nil {
 			return "", err
@@ -312,6 +324,17 @@ func (mi *MetaInfo) Sha1Sum() (string, error) {
 	return string(h.Sum(nil)), nil
 }
 
+func (mi *MetaInfo) PieceHashes() (ph []string) {
+	pieces := []byte(mi.Pieces)
+
+	for i := 0; i < len(pieces); i += 20 {
+		hash := pieces[i : i+20]
+		ph = append(ph, fmt.Sprintf("%x", hash))
+	}
+
+	return
+}
+
 type MetaFile struct {
 	Announce string
 	Info     MetaInfo
@@ -389,9 +412,13 @@ func main() {
 			return
 		}
 
+		pieceHashes := mf.Info.PieceHashes()
+
 		fmt.Printf("Tracker URL: %v\n", mf.Announce)
 		fmt.Printf("Length: %v\n", mf.Info.Length)
 		fmt.Printf("Info Hash: %x\n", infoHash)
+		fmt.Printf("Piece Length: %v\n", mf.Info.PieceLength)
+		fmt.Printf("Piece Hashes:\n%v\n", strings.Join(pieceHashes, "\n"))
 
 	default:
 		fmt.Println("Unknown command: " + command)
