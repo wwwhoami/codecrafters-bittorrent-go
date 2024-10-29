@@ -172,11 +172,24 @@ func decodeBencode(bencode string) (interface{}, error) {
 	return decodeValue(r)
 }
 
+func parseTorrentFile(filename string) (map[string]interface{}, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+
+	r := bufio.NewReader(file)
+
+	return decodeDict(r)
+}
+
 func main() {
 	command := os.Args[1]
 
-	if command == "decode" {
-
+	switch command {
+	case "decode":
 		bencodedValue := os.Args[2]
 
 		decoded, err := decodeBencode(bencodedValue)
@@ -187,8 +200,27 @@ func main() {
 
 		jsonOutput, _ := json.Marshal(decoded)
 		fmt.Println(string(jsonOutput))
-	} else {
+	case "info":
+		filename := os.Args[2]
+
+		parsed, err := parseTorrentFile(filename)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Printf("Tracker URL: %v\n", parsed["announce"])
+		info, ok := parsed["info"].(map[string]interface{})
+		if info == nil || !ok {
+			fmt.Println("Invalid torrent file format")
+			return
+		}
+
+		fmt.Printf("Length: %v\n", info["length"])
+
+	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
+
 	}
 }
