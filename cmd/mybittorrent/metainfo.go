@@ -120,6 +120,27 @@ func parseMetaFile(filename string) (*MetaFile, error) {
 	return torrent, err
 }
 
+func (mf *MetaFile) handshakeMsg() ([]byte, error) {
+	infoHash, err := mf.Info.Sha1Sum()
+	if err != nil {
+		return nil, err
+	}
+
+	peerId, err := genRandStr(20)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate peer ID: %v", err)
+	}
+
+	handshakeMsg := make([]byte, 0, handshakeMsgSize)
+	handshakeMsg = append(handshakeMsg, 19)
+	handshakeMsg = append(handshakeMsg, []byte("BitTorrent protocol")...)
+	handshakeMsg = append(handshakeMsg, make([]byte, 8)...)
+	handshakeMsg = append(handshakeMsg, infoHash...)
+	handshakeMsg = append(handshakeMsg, peerId...)
+
+	return handshakeMsg, nil
+}
+
 // getStringFromMap returns a string value from a map.
 func getStringFromMap(m map[string]any, key string) (string, error) {
 	if value, ok := m[key].(string); ok {

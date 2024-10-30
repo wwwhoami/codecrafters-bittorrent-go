@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // genRandStr generates a random string of the specified length.
@@ -30,6 +32,24 @@ type Peer struct {
 
 func (p Peer) String() string {
 	return fmt.Sprintf("%s:%d", p.ip, p.port)
+}
+
+func NewPeerFromAddr(addr string) (*Peer, error) {
+	peerStr := strings.Split(addr, ":")
+
+	peerIp := peerStr[0]
+	if net.ParseIP(peerIp) == nil {
+		return nil, fmt.Errorf("invalid IP address: %v", peerIp)
+	}
+
+	peerPort, err := strconv.Atoi(peerStr[1])
+	if err != nil {
+		return nil, err
+	} else if peerPort < 0 || peerPort > 65535 {
+		return nil, fmt.Errorf("invalid port: %v", peerPort)
+	}
+
+	return &Peer{peerIp, uint16(peerPort)}, nil
 }
 
 // parsePeers parses the peers info from the tracker response.
