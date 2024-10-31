@@ -73,12 +73,7 @@ func parsePeers(peersInfo string) ([]Peer, error) {
 
 // discoverPeers sends a request to the tracker to discover peers.
 // The returned response is a list of peer IP addresses and ports.
-func discoverPeers(filename string) (peersInfo []Peer, err error) {
-	mf, err := parseMetaFile(filename)
-	if err != nil {
-		return
-	}
-
+func discoverPeers(mf *MetaFile) (peers []Peer, err error) {
 	body, err := requestTracker(mf)
 	if err != nil {
 		return
@@ -95,7 +90,7 @@ func discoverPeers(filename string) (peersInfo []Peer, err error) {
 		return
 	}
 
-	peersInfo, err = parsePeers(peersInfoBencoded)
+	peers, err = parsePeers(peersInfoBencoded)
 	if err != nil {
 		return
 	}
