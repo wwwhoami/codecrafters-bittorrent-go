@@ -38,9 +38,156 @@ func processCommand(command string) error {
 		return handshakeCommand()
 	case "download_piece":
 		return downloadPieceCommand()
+	case "download":
+		return downloadCommand()
 	default:
 		return fmt.Errorf("unknown command: %v", command)
 	}
+}
+
+func downloadCommand() error {
+	outFilename, filename, err := parseDownloadArgs()
+	if err != nil {
+		return fmt.Errorf("failed to parse download piece args: %v", err)
+	}
+
+	fmt.Printf("Downloading file: %v\n", filename)
+	fmt.Printf("Output file: %v\n", outFilename)
+
+	mf, err := parseMetaFile(filename)
+	if err != nil {
+		return fmt.Errorf("failed to parse metafile: %v", err)
+	}
+
+	peersInfo, err := discoverPeers(mf)
+	if err != nil {
+		return err
+	}
+
+	peer := peersInfo[0]
+
+	conn, err := net.Dial("tcp", peer.String())
+	if err != nil {
+		return fmt.Errorf("failed to connect to peer: %v", err)
+	}
+	defer conn.Close()
+
+	handshakeMsg, err := mf.handshakeMsg()
+	if err != nil {
+		return fmt.Errorf("failed to create handshake message: %v", err)
+	}
+
+	if err := sendHandshake(conn, handshakeMsg); err != nil {
+		return fmt.Errorf("failed peer handshake: %v", err)
+	}
+
+	rcvHandshake, err := receiveHandshake(conn)
+	if err != nil {
+		return fmt.Errorf("failed handshake receive: %v", err)
+	}
+
+	_ = rcvHandshake[48:]
+	fmt.Printf("Successful handshake with peer %v\n", peer)
+
+	// get bitfield message
+	peerMsg, err := readPeerMsg(conn)
+	if err != nil {
+		return fmt.Errorf("failed to read bitfield message: %v", err)
+	}
+
+	fmt.Printf("Got BITFIELD message: %v\n", peerMsg)
+
+	// send interested message
+	msg := NewPeerMsg(INTERESTED_ID, nil)
+	if err := sendPeerMsg(conn, msg); err != nil {
+		return fmt.Errorf("failed to send interested message: %v", err)
+	}
+
+	fmt.Printf("Sent INTERESTED message: %v\n", msg)
+
+	// get unchoke message
+	peerMsg, err = waitForPeerMsg(conn, UNCHOKE_ID)
+	if err != nil {
+		return fmt.Errorf("failed to get unchoke message: %v", err)
+	}
+	fmt.Printf("Got UNCHOKE message: %v\n", peerMsg)
+
+	pieces := mf.Info.PieceHashes()
+
+	// download pieces
+	for i := 0; i < len(pieces); i++ {
+		pieceFile := fmt.Sprintf("%v-piece-%v", outFilename, i)
+
+		// download piece
+		data, err := downloadPiece(conn, mf, i)
+		if err != nil {
+			return fmt.Errorf("failed to download piece: %v", err)
+		}
+
+		// write piece data to file
+		if err := writeToOut(pieceFile, data); err != nil {
+			fmt.Printf("failed to write piece data to file: %v\n", err)
+		}
+
+		fmt.Printf("Piece downloaded to: %v\n", pieceFile)
+	}
+
+	outFile, err := os.Create(outFilename)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %v", err)
+	}
+
+	defer outFile.Close()
+
+	// create file from pieces
+	for i := 0; i < len(pieces); i++ {
+		pieceFile := fmt.Sprintf("%v-piece-%v", outFilename, i)
+
+		piece_file, err := os.Open(pieceFile)
+		if err != nil {
+			return fmt.Errorf("failed to open piece file: %v", err)
+		}
+
+		_, err = io.Copy(outFile, piece_file)
+		if err != nil {
+			return fmt.Errorf("failed to copy piece data to stdout: %v", err)
+		}
+
+		piece_file.Close()
+	}
+
+	fmt.Printf("File downloaded to: %v\n", outFilename)
+
+	return nil
+}
+
+func parseDownloadArgs() (outFile, filename string, err error) {
+	if len(os.Args) < 5 {
+		err = fmt.Errorf("not enough arguments")
+		return
+	}
+
+	fmt.Printf("Args: %v\n", os.Args)
+
+	outFile, filename = os.Args[3], os.Args[4]
+	if filename == "" {
+		err = fmt.Errorf("not enough arguments")
+		return
+	}
+
+	pieceOutPath := outFile[:strings.LastIndex(outFile, "/")]
+
+	// Create piece output file directory if it doesn't exist
+	if _, err = os.Stat(outFile); err != nil {
+		fmt.Printf("Piece output directory doesn't exist, creating dir: %v\n", pieceOutPath)
+
+		if err = os.MkdirAll(pieceOutPath, os.ModePerm); err != nil {
+			err = fmt.Errorf("failed to create piece output directory: %v", err)
+			return
+		}
+	}
+
+	return
 }
 
 const (
@@ -92,6 +239,7 @@ func downloadPieceCommand() error {
 	}
 
 	_ = rcvHandshake[48:]
+	fmt.Printf("Successful handshake with peer %v\n", peer)
 
 	// get bitfield message
 	peerMsg, err := readPeerMsg(conn)
@@ -139,6 +287,8 @@ func writeToOut(outFile string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to create piece output file: %v", err)
 	}
+
+	defer file.Close()
 
 	if _, err = file.Write(data); err != nil {
 		return fmt.Errorf("failed to write data to file: %v", err)
