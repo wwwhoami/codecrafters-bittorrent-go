@@ -1,0 +1,8 @@
+[
+  { "slug": "nd2", "tester_log_prefix": "nd2", "title": "Download a piece" },
+  {
+    "slug": "jv8",
+    "tester_log_prefix": "jv8",
+    "title": "Download the whole file"
+  }
+]
