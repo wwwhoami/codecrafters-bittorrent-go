@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -54,33 +53,16 @@ func downloadCommand() error {
 	fmt.Printf("Downloading file: %v\n", filename)
 	fmt.Printf("Output file: %v\n", outFilename)
 
-	mf, err := parseMetaFile(filename)
+	mf, err := ParseMetaFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to parse metafile: %v", err)
-	}
-
-	peersInfo, err := discoverPeers(mf)
-	if err != nil {
-		return err
 	}
 
 	torrent, err := NewTorrent(mf)
 	if err != nil {
 		return fmt.Errorf("failed to create torrent: %v", err)
 	}
-
-	for _, peer := range peersInfo {
-		pc, err := NewPeerConn(mf, peer)
-		if err != nil {
-			return fmt.Errorf("failed to create peer %v connection: %v", peer, err)
-		}
-
-		if err := pc.Handshake(mf); err != nil {
-			return fmt.Errorf("failed to handshake with peer %v: %v", peer, err)
-		}
-
-		torrent.AddPeerConn(pc)
-	}
+	defer torrent.Close()
 
 	if err := torrent.DownloadFile(outFilename); err != nil {
 		return fmt.Errorf("failed to download file: %v", err)
@@ -126,12 +108,12 @@ func downloadPieceCommand() error {
 		return fmt.Errorf("failed to parse download piece args: %v", err)
 	}
 
-	mf, err := parseMetaFile(filename)
+	mf, err := ParseMetaFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to parse metafile: %v", err)
 	}
 
-	peersInfo, err := discoverPeers(mf)
+	peersInfo, err := DiscoverPeers(mf)
 	if err != nil {
 		return err
 	}
@@ -144,10 +126,6 @@ func downloadPieceCommand() error {
 	}
 
 	defer pc.Close()
-
-	if err := pc.Handshake(mf); err != nil {
-		return fmt.Errorf("failed to handshake with peer: %v", err)
-	}
 
 	if err := pc.PreDownload(); err != nil {
 		return fmt.Errorf("failed to prepare download: %v", err)
@@ -176,7 +154,6 @@ func writeToOut(outFile string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to create piece output file: %v", err)
 	}
-
 	defer file.Close()
 
 	if _, err = file.Write(data); err != nil {
@@ -228,7 +205,7 @@ func handshakeCommand() error {
 
 	filename, peerAddr := os.Args[2], os.Args[3]
 
-	mf, err := parseMetaFile(filename)
+	mf, err := ParseMetaFile(filename)
 	if err != nil {
 		return err
 	}
@@ -238,27 +215,13 @@ func handshakeCommand() error {
 		return fmt.Errorf("failed to create peer: %v", err)
 	}
 
-	conn, err := net.Dial("tcp", peer.String())
+	pc, err := NewPeerConn(mf, *peer)
 	if err != nil {
-		return fmt.Errorf("failed to connect to peer: %v", err)
+		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
-	defer conn.Close()
+	defer pc.Close()
 
-	handshakeMsg, err := mf.handshakeMsg()
-	if err != nil {
-		return fmt.Errorf("failed to create handshake message: %v", err)
-	}
-
-	if err := sendHandshake(conn, handshakeMsg); err != nil {
-		return err
-	}
-
-	rcvHandshake, err := receiveHandshake(conn)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Peer ID: %x\n", rcvHandshake[48:])
+	fmt.Printf("Peer ID: %x\n", pc.id)
 
 	return nil
 }
@@ -280,7 +243,7 @@ func decodeCommand() error {
 func infoCommand() error {
 	filename := os.Args[2]
 
-	mf, err := parseMetaFile(filename)
+	mf, err := ParseMetaFile(filename)
 	if err != nil {
 		return err
 	}
@@ -302,12 +265,12 @@ func infoCommand() error {
 func peersCommand() error {
 	filename := os.Args[2]
 
-	mf, err := parseMetaFile(filename)
+	mf, err := ParseMetaFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to parse metafile: %v", err)
 	}
 
-	peersInfo, err := discoverPeers(mf)
+	peersInfo, err := DiscoverPeers(mf)
 	if err != nil {
 		return err
 	}

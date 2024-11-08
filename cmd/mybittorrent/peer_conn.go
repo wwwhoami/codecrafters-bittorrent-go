@@ -22,10 +22,12 @@ const (
 // PeerConn manages the connection to a peer
 type PeerConn struct {
 	conn net.Conn
+	id   string
 	peer Peer
 }
 
-// NewPeerConn creates a new connection to a peer
+// NewPeerConn creates a new connection to the peer and performs the handshake
+// with the peer.
 func NewPeerConn(mf *MetaFile, peer Peer) (*PeerConn, error) {
 	conn, err := net.Dial("tcp", peer.String())
 	if err != nil {
@@ -37,52 +39,12 @@ func NewPeerConn(mf *MetaFile, peer Peer) (*PeerConn, error) {
 		peer: peer,
 	}
 
+	pc.id, err = pc.handshake(mf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to handshake with peer: %w", err)
+	}
+
 	return pc, nil
-}
-
-func (pc *PeerConn) Handshake(mf *MetaFile) error {
-	handshakeMsg, err := mf.handshakeMsg()
-	if err != nil {
-		return fmt.Errorf("failed to create handshake message: %v", err)
-	}
-
-	if err := sendHandshake(pc.conn, handshakeMsg); err != nil {
-		return err
-	}
-
-	rcvHandshake, err := receiveHandshake(pc.conn)
-	if err != nil {
-		return err
-	}
-
-	peerId := rcvHandshake[48:]
-
-	log.Printf("Handshake successful with peer ID: %x\n", peerId)
-
-	return nil
-}
-
-func sendHandshake(conn net.Conn, handshakeMsg []byte) error {
-	_, err := conn.Write(handshakeMsg)
-	if err != nil {
-		return fmt.Errorf("failed to write handshake message: %v", err)
-	}
-
-	return nil
-}
-
-func receiveHandshake(conn net.Conn) ([]byte, error) {
-	rcvHandshake := make([]byte, handshakeMsgSize)
-
-	n, err := conn.Read(rcvHandshake)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read handshake response: %v", err)
-	}
-	if n != handshakeMsgSize {
-		return nil, fmt.Errorf("invalid handshake response length: %v", n)
-	}
-
-	return rcvHandshake, nil
 }
 
 // PreDownload performs the setup for downloading a file from a peer connection
@@ -213,6 +175,56 @@ func verifyPiece(got []byte, expected string) error {
 		return fmt.Errorf("Hash mismatch: expected %s, got %s\n", expected, hashStr)
 	}
 	return nil
+}
+
+// handshake performs the handshake with the peer and returns the peer ID
+// received in the handshake response message
+func (pc *PeerConn) handshake(mf *MetaFile) (peerID string, err error) {
+	handshakeMsg, err := mf.HandshakeMsg()
+	if err != nil {
+		err = fmt.Errorf("failed to create handshake message: %v", err)
+		return
+	}
+
+	if err = sendHandshake(pc.conn, handshakeMsg); err != nil {
+		err = fmt.Errorf("failed to send handshake message: %v", err)
+		return
+	}
+
+	rcvHandshake, err := receiveHandshake(pc.conn)
+	if err != nil {
+		err = fmt.Errorf("failed to receive handshake response: %v", err)
+		return
+	}
+
+	peerID = string(rcvHandshake[48:])
+
+	log.Printf("Handshake successful with peer ID: %x\n", peerID)
+
+	return
+}
+
+func sendHandshake(conn net.Conn, handshakeMsg []byte) error {
+	_, err := conn.Write(handshakeMsg)
+	if err != nil {
+		return fmt.Errorf("failed to write handshake message: %v", err)
+	}
+
+	return nil
+}
+
+func receiveHandshake(conn net.Conn) ([]byte, error) {
+	rcvHandshake := make([]byte, handshakeMsgSize)
+
+	n, err := conn.Read(rcvHandshake)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read handshake response: %v", err)
+	}
+	if n != handshakeMsgSize {
+		return nil, fmt.Errorf("invalid handshake response length: %v", n)
+	}
+
+	return rcvHandshake, nil
 }
 
 // sendPeerMsg sends a message to the peer

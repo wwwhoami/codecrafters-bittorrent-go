@@ -12,9 +12,9 @@ import (
 	"strings"
 )
 
-// genRandStr generates a random string of the specified length.
+// GenRandStr generates a random string of the specified length.
 // The resulting string is base64 encoded.
-func genRandStr(length int) (string, error) {
+func GenRandStr(length int) (string, error) {
 	buffer := make([]byte, length)
 
 	_, err := rand.Read(buffer)
@@ -71,9 +71,9 @@ func parsePeers(peersInfo string) ([]Peer, error) {
 	return peers, nil
 }
 
-// discoverPeers sends a request to the tracker to discover peers.
+// DiscoverPeers sends a request to the tracker to discover peers.
 // The returned response is a list of peer IP addresses and ports.
-func discoverPeers(mf *MetaFile) (peers []Peer, err error) {
+func DiscoverPeers(mf *MetaFile) (peers []Peer, err error) {
 	body, err := requestTracker(mf)
 	if err != nil {
 		return
@@ -106,7 +106,7 @@ func requestTracker(mf *MetaFile) ([]byte, error) {
 		return nil, err
 	}
 
-	peerId, err := genRandStr(20)
+	peerId, err := GenRandStr(20)
 	if err != nil {
 		return nil, err
 	}

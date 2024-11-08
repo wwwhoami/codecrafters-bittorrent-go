@@ -15,46 +15,50 @@ type Torrent struct {
 }
 
 func NewTorrent(mf *MetaFile) (*Torrent, error) {
-	workQueueLen := len(mf.Info.PieceHashes)
-
-	peersInfo, err := discoverPeers(mf)
+	peersInfo, err := DiscoverPeers(mf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover peers: %v", err)
 	}
 
-	peersLen := len(peersInfo)
+	t := &Torrent{
+		mf,
+		make(chan *PieceWork, len(mf.Info.PieceHashes)),
+		make([]*PeerConn, 0, len(peersInfo)),
+	}
 
-	return &Torrent{mf, make(chan *PieceWork, workQueueLen), make([]*PeerConn, 0, peersLen)}, nil
+	if err := t.connectPeers(peersInfo); err != nil {
+		return nil, fmt.Errorf("failed to connect to peers: %v", err)
+	}
+
+	return t, nil
 }
 
-func (t *Torrent) AddPeerConn(pc *PeerConn) {
+func (t *Torrent) addPeerConn(pc *PeerConn) {
 	t.peerConns = append(t.peerConns, pc)
 }
 
-func (t *Torrent) AddPiece(p *PieceWork) {
+func (t *Torrent) addPiece(p *PieceWork) {
 	t.workQueue <- p
 }
 
-func (t *Torrent) NextPiece() *PieceWork {
-	return <-t.workQueue
-}
-
-type Piece struct {
-	hash string
-	data []byte
-	idx  int
-}
-
-type PieceWork struct {
-	piece   *Piece
-	retries int
-}
-
-func NewPieceWork(piece *Piece) *PieceWork {
-	return &PieceWork{piece, 0}
-}
-
 const PieceDownloadRetries = 5
+
+// connectPeers connects to the peers in the given list. It creates a PeerConn
+// for each peer and performs a handshake with the peer. If the handshake is
+// successful, it adds the PeerConn to the Torrent's peerConns list.
+// If the handshake fails, it returns an error.
+func (t *Torrent) connectPeers(peersInfo []Peer) error {
+	for _, peer := range peersInfo {
+		pc, err := NewPeerConn(t.mf, peer)
+		if err != nil {
+			return fmt.Errorf("failed to create peer %v connection: %v", peer, err)
+		}
+
+		t.addPeerConn(pc)
+	}
+
+	return nil
+}
 
 // DownloadFile downloads the file from the torrent to the given output file.
 // It downloads the pieces concurrently from the available peers. If a piece
@@ -72,7 +76,7 @@ func (t *Torrent) DownloadFile(outFilename string) (err error) {
 
 	for i, pieceHash := range pieceHashes {
 		pieceWork := NewPieceWork(&Piece{hash: pieceHash, idx: i})
-		t.AddPiece(pieceWork)
+		t.addPiece(pieceWork)
 	}
 
 	errCh := make(chan error, len(pieceHashes))
@@ -150,6 +154,30 @@ L:
 	log.Printf("File %s successfully downloaded in %.3fs\n", outFilename, time.Since(startTime).Seconds())
 
 	return
+}
+
+// Close closes all peer connections.
+func (t *Torrent) Close() {
+	for _, pc := range t.peerConns {
+		pc.Close()
+	}
+}
+
+// Piece represents a piece of the file to be downloaded.
+type Piece struct {
+	hash string
+	data []byte
+	idx  int
+}
+
+// PieceWork represents a piece of work to be done by a worker.
+type PieceWork struct {
+	piece   *Piece
+	retries int
+}
+
+func NewPieceWork(piece *Piece) *PieceWork {
+	return &PieceWork{piece, 0}
 }
 
 // writePiecesToOut writes the pieces to the output file

@@ -104,7 +104,9 @@ func NewMetaFileFromMap(m map[string]any) (*MetaFile, error) {
 	return mf, nil
 }
 
-func parseMetaFile(filename string) (*MetaFile, error) {
+// ParseMetaFile parses a .torrent file and returns a MetaFile instance,
+// containing the metadata information of the torrent.
+func ParseMetaFile(filename string) (*MetaFile, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -124,13 +126,14 @@ func parseMetaFile(filename string) (*MetaFile, error) {
 	return torrent, err
 }
 
-func (mf *MetaFile) handshakeMsg() ([]byte, error) {
+// HandshakeMsg creates a handshake message for the torrent.
+func (mf *MetaFile) HandshakeMsg() ([]byte, error) {
 	infoHash, err := mf.Info.Sha1Sum()
 	if err != nil {
 		return nil, err
 	}
 
-	peerId, err := genRandStr(20)
+	peerId, err := GenRandStr(20)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate peer ID: %v", err)
 	}
