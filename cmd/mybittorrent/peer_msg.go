@@ -5,13 +5,27 @@ import (
 	"fmt"
 )
 
+type MsgID uint8
+
+const (
+	MsgChoke         MsgID = 0
+	MsgUnchoke       MsgID = 1
+	msgInterested    MsgID = 2
+	msgNotInterested MsgID = 3
+	msgHave          MsgID = 4
+	msgBitfield      MsgID = 5
+	msgRequest       MsgID = 6
+	msgPiece         MsgID = 7
+	msgCancel        MsgID = 8
+)
+
 type PeerMsg struct {
 	payload []byte
 	length  uint32
-	id      uint8
+	id      MsgID
 }
 
-func NewPeerMsg(id uint8, payload []byte) *PeerMsg {
+func NewPeerMsg(id MsgID, payload []byte) *PeerMsg {
 	// Default length is 1 byte
 	// 1 byte for ID
 	length := uint32(1)
@@ -35,7 +49,7 @@ func NewPeerMsgFromBytes(data []byte) (*PeerMsg, error) {
 }
 
 func (p PeerMsg) String() string {
-	if p.id == REQUEST_ID {
+	if p.id == msgRequest {
 		payload := RequestPayload{}
 		if err := payload.UnmarshalBinary(p.payload); err == nil {
 			return fmt.Sprintf("PeerMsg{length: %v, id: %v, payload: %+v}", p.length, p.id, payload)
@@ -44,15 +58,15 @@ func (p PeerMsg) String() string {
 	return fmt.Sprintf("PeerMsg{length: %v, id: %v, payload_len: %+v}", p.length, p.id, len(p.payload))
 }
 
-func (p PeerMsg) MarshalBinary() []byte {
-	msg := make([]byte, 0, p.length)
+func (p PeerMsg) MarshalBinary() (msg []byte) {
+	msg = make([]byte, 0, p.length)
 
 	msg = append(msg, binary.BigEndian.AppendUint32(nil, p.length)...)
-	msg = append(msg, p.id)
+	msg = append(msg, byte(p.id))
 
 	msg = append(msg, p.payload...)
 
-	return msg
+	return
 }
 
 func (p *PeerMsg) UnmarshalBinary(data []byte) error {
@@ -61,7 +75,7 @@ func (p *PeerMsg) UnmarshalBinary(data []byte) error {
 	}
 
 	p.length = binary.BigEndian.Uint32(data[:4])
-	p.id = data[4]
+	p.id = MsgID(data[4])
 
 	payloadStartIdx := 5
 	// p.length - 1 to exclude the ID byte

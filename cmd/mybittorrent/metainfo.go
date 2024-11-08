@@ -12,6 +12,7 @@ import (
 type MetaInfo struct {
 	Name        string
 	Pieces      string
+	PieceHashes []string
 	Length      int
 	PieceLength int
 }
@@ -32,6 +33,8 @@ func NewMetaInfoFromMap(m map[string]any) (mi *MetaInfo, err error) {
 	if mi.PieceLength, err = getIntFromMap(m, "piece length"); err != nil {
 		return
 	}
+
+	mi.PieceHashes = mi.pieceHashes()
 
 	return
 }
@@ -62,7 +65,8 @@ func (mi *MetaInfo) Sha1Sum() (string, error) {
 	return string(h.Sum(nil)), nil
 }
 
-func (mi *MetaInfo) PieceHashes() (ph []string) {
+// pieceHashes returns the SHA1 hashes of the pieces.
+func (mi *MetaInfo) pieceHashes() (ph []string) {
 	pieces := []byte(mi.Pieces)
 
 	for i := 0; i < len(pieces); i += 20 {
