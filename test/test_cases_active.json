@@ -1,8 +1,8 @@
 [
   {
     "slug": "hw0",
-    "tester_log_prefix": "Parse a magnet link",
-    "title": "hw0"
+    "tester_log_prefix": "hw0",
+    "title": "Parse a magnet link"
   },
   {
     "slug": "jv8",

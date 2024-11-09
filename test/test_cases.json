@@ -30,28 +30,44 @@
     "tester_log_prefix": "jv8",
     "title": "Download the whole file"
   },
-  { "slug": "hw0", "tester_log_prefix": "Parse a magnet link", "title": "hw0" },
+  {
+    "slug": "hw0",
+    "tester_log_prefix": "hw0",
+    "title": "Parse a magnet link"
+  },
   {
     "slug": "pk2",
-    "tester_log_prefix": "Announce extension support",
-    "title": "pk2"
+    "tester_log_prefix": "pk2",
+    "title": "Announce extension support"
   },
   {
     "slug": "xi4",
-    "tester_log_prefix": "Send extension handshake",
-    "title": "xi4"
+    "tester_log_prefix": "xi4",
+    "title": "Send extension handshake"
   },
   {
     "slug": "jk6",
-    "tester_log_prefix": "Receive extension handshake",
-    "title": "jk6"
+    "tester_log_prefix": "jk6",
+    "title": "Receive extension handshake"
   },
-  { "slug": "ns5", "tester_log_prefix": "Request metadata", "title": "ns5" },
-  { "slug": "zh1", "tester_log_prefix": "Receive matadata", "title": "zh1" },
-  { "slug": "qv6", "tester_log_prefix": "Download a piece", "title": "qv6" },
+  {
+    "slug": "ns5",
+    "tester_log_prefix": "ns5",
+    "title": "Request metadata"
+  },
+  {
+    "slug": "zh1",
+    "tester_log_prefix": "zh1",
+    "title": "Receive matadata"
+  },
+  {
+    "slug": "qv6",
+    "tester_log_prefix": "qv6",
+    "title": "Download a piece"
+  },
   {
     "slug": "dv7",
-    "tester_log_prefix": "Download the whole file",
-    "title": "dv7"
+    "tester_log_prefix": "dv7",
+    "title": "Download the whole file"
   }
 ]
