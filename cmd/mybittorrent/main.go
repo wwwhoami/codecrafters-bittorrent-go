@@ -39,9 +39,30 @@ func processCommand(command string) error {
 		return downloadPieceCommand()
 	case "download":
 		return downloadCommand()
+	case "magnet_parse":
+		return magnetParseCommand()
 	default:
 		return fmt.Errorf("unknown command: %v", command)
 	}
+}
+
+func magnetParseCommand() error {
+	if len(os.Args) < 3 {
+		return fmt.Errorf("not enough arguments: expected 'mybittorrent magnet_parse <magnet_link>'")
+	}
+
+	matnetLink := os.Args[2]
+
+	infoHash, filename, trackerURL, err := parseMagnetLink(matnetLink)
+	if err != nil {
+		return fmt.Errorf("failed to parse magnet link: %v", err)
+	}
+
+	fmt.Printf("Tracker URL: %v\n", trackerURL)
+	fmt.Printf("Info Hash: %v\n", infoHash)
+	fmt.Printf("Filename: %v\n", filename)
+
+	return nil
 }
 
 func downloadCommand() error {

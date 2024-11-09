@@ -1,8 +1,62 @@
 [
-  { "slug": "nd2", "tester_log_prefix": "nd2", "title": "Download a piece" },
+  {
+    "slug": "hw0",
+    "tester_log_prefix": "Parse a magnet link",
+    "title": "hw0"
+  },
   {
     "slug": "jv8",
     "tester_log_prefix": "jv8",
     "title": "Download the whole file"
+  },
+  {
+    "slug": "nd2",
+    "tester_log_prefix": "nd2",
+    "title": "Download a piece"
+  },
+  {
+    "slug": "ca4",
+    "tester_log_prefix": "ca4",
+    "title": "Peer handshake"
+  },
+  {
+    "slug": "fi9",
+    "tester_log_prefix": "fi9",
+    "title": "Discover peers"
+  },
+  {
+    "slug": "bf7",
+    "tester_log_prefix": "bf7",
+    "title": "Piece hashes"
+  },
+  {
+    "slug": "rb2",
+    "tester_log_prefix": "rb2",
+    "title": "Calculate info hash"
+  },
+  {
+    "slug": "ow9",
+    "tester_log_prefix": "ow9",
+    "title": "Parse torrent file"
+  },
+  {
+    "slug": "mn6",
+    "tester_log_prefix": "mn6",
+    "title": "Decode bencoded dictionaries"
+  },
+  {
+    "slug": "ah1",
+    "tester_log_prefix": "ah1",
+    "title": "Decode bencoded lists"
+  },
+  {
+    "slug": "eb4",
+    "tester_log_prefix": "eb4",
+    "title": "Decode bencoded integers"
+  },
+  {
+    "slug": "ns2",
+    "tester_log_prefix": "ns2",
+    "title": "Decode bencoded string"
   }
 ]
