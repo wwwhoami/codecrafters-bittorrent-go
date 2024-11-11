@@ -12,6 +12,7 @@ import (
 type MetaInfo struct {
 	Name        string
 	Pieces      string
+	Hash        string
 	PieceHashes []string
 	Length      int
 	PieceLength int
@@ -35,6 +36,11 @@ func NewMetaInfoFromMap(m map[string]any) (mi *MetaInfo, err error) {
 	}
 
 	mi.PieceHashes = mi.pieceHashes()
+	mi.Hash, err = mi.Sha1Sum()
+	if err != nil {
+		err = fmt.Errorf("failed to calculate info hash: %v", err)
+		return nil, err
+	}
 
 	return
 }
@@ -121,27 +127,26 @@ func ParseMetaFile(filename string) (*MetaFile, error) {
 		return nil, err
 	}
 
-	torrent, err := NewMetaFileFromMap(decoded)
+	metafile, err := NewMetaFileFromMap(decoded)
 
-	return torrent, err
+	return metafile, err
 }
 
 // HandshakeMsg creates a handshake message for the torrent.
-func (mf *MetaFile) HandshakeMsg() ([]byte, error) {
-	infoHash, err := mf.Info.Sha1Sum()
-	if err != nil {
-		return nil, err
-	}
-
+func HandshakeMsg(infoHash string, reservedBytes *[8]byte) ([]byte, error) {
 	peerId, err := GenRandStr(20)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate peer ID: %v", err)
 	}
 
+	if reservedBytes == nil {
+		reservedBytes = new([8]byte)
+	}
+
 	handshakeMsg := make([]byte, 0, handshakeMsgSize)
 	handshakeMsg = append(handshakeMsg, 19)
 	handshakeMsg = append(handshakeMsg, []byte("BitTorrent protocol")...)
-	handshakeMsg = append(handshakeMsg, make([]byte, 8)...)
+	handshakeMsg = append(handshakeMsg, reservedBytes[:]...)
 	handshakeMsg = append(handshakeMsg, infoHash...)
 	handshakeMsg = append(handshakeMsg, peerId...)
 

@@ -1,5 +1,10 @@
 [
   {
+    "slug": "pk2",
+    "tester_log_prefix": "pk2",
+    "title": "Announce extension support"
+  },
+  {
     "slug": "hw0",
     "tester_log_prefix": "hw0",
     "title": "Parse a magnet link"

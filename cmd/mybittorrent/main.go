@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -41,9 +42,65 @@ func processCommand(command string) error {
 		return downloadCommand()
 	case "magnet_parse":
 		return magnetParseCommand()
+	case "magnet_handshake":
+		return magnetHandshakeCommand()
 	default:
 		return fmt.Errorf("unknown command: %v", command)
 	}
+}
+
+func magnetHandshakeCommand() error {
+	if len(os.Args) < 3 {
+		return fmt.Errorf("not enough arguments: expected 'mybittorrent magnet_handshake <magnet_link>'")
+	}
+
+	magnetLink := os.Args[2]
+
+	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	if err != nil {
+		return fmt.Errorf("failed to parse magnet link: %v", err)
+	}
+
+	// Convert the info hash from hex to binary
+	infoHashHex, err := hex.DecodeString(infoHash)
+	if err != nil {
+		return fmt.Errorf("failed to decode info hash: %v", err)
+	}
+
+	infoHash = string(infoHashHex)
+
+	body, err := requestTracker(trackerURL, infoHash, 1)
+	if err != nil {
+		return fmt.Errorf("failed to request tracker: %v", err)
+	}
+
+	trackerInfo, err := decodeBencode(string(body))
+	if err != nil {
+		return fmt.Errorf("failed to decode tracker response: %v", err)
+	}
+
+	peersInfoBencoded, ok := trackerInfo.(map[string]any)["peers"].(string)
+	if !ok {
+		return fmt.Errorf("invalid peers info")
+	}
+
+	peers, err := parsePeers(peersInfoBencoded)
+	if err != nil {
+		return fmt.Errorf("failed to parse peers: %v", err)
+	}
+
+	fmt.Printf("Peers Discovered:\n%v\n", peers)
+
+	peer := peers[0]
+
+	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	if err != nil {
+		return fmt.Errorf("failed to create peer connection: %v", err)
+	}
+
+	fmt.Printf("Peer ID: %x\n", pc.id)
+
+	return err
 }
 
 func magnetParseCommand() error {
@@ -141,7 +198,7 @@ func downloadPieceCommand() error {
 
 	peer := peersInfo[0]
 
-	pc, err := NewPeerConn(mf, peer)
+	pc, err := NewPeerConn(peer, mf.Info.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -236,7 +293,7 @@ func handshakeCommand() error {
 		return fmt.Errorf("failed to create peer: %v", err)
 	}
 
-	pc, err := NewPeerConn(mf, *peer)
+	pc, err := NewPeerConn(*peer, mf.Info.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -269,14 +326,9 @@ func infoCommand() error {
 		return err
 	}
 
-	infoHash, err := mf.Info.Sha1Sum()
-	if err != nil {
-		return err
-	}
-
 	fmt.Printf("Tracker URL: %v\n", mf.Announce)
 	fmt.Printf("Length: %v\n", mf.Info.Length)
-	fmt.Printf("Info Hash: %x\n", infoHash)
+	fmt.Printf("Info Hash: %x\n", mf.Info.Hash)
 	fmt.Printf("Piece Length: %v\n", mf.Info.PieceLength)
 	fmt.Printf("Piece Hashes:\n%v\n", strings.Join(mf.Info.PieceHashes, "\n"))
 

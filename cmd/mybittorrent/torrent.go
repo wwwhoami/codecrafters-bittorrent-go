@@ -49,7 +49,7 @@ const PieceDownloadRetries = 5
 // If the handshake fails, it returns an error.
 func (t *Torrent) connectPeers(peersInfo []Peer) error {
 	for _, peer := range peersInfo {
-		pc, err := NewPeerConn(t.mf, peer)
+		pc, err := NewPeerConn(peer, t.mf.Info.Hash)
 		if err != nil {
 			return fmt.Errorf("failed to create peer %v connection: %v", peer, err)
 		}

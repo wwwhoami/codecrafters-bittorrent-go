@@ -28,7 +28,7 @@ type PeerConn struct {
 
 // NewPeerConn creates a new connection to the peer and performs the handshake
 // with the peer.
-func NewPeerConn(mf *MetaFile, peer Peer) (*PeerConn, error) {
+func NewPeerConn(peer Peer, infoHash string) (*PeerConn, error) {
 	conn, err := net.Dial("tcp", peer.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to peer: %w", err)
@@ -39,7 +39,30 @@ func NewPeerConn(mf *MetaFile, peer Peer) (*PeerConn, error) {
 		peer: peer,
 	}
 
-	pc.id, err = pc.handshake(mf)
+	pc.id, err = pc.handshake(infoHash, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to handshake with peer: %w", err)
+	}
+
+	return pc, nil
+}
+
+// NewPeerConnWithExtension creates a new connection to the peer and performs
+// the extension handshake with the peer. The extension handshake is used to
+// indicate that the client supports the bittorrent extension protocol.
+func NewPeerConnWithExtension(peer Peer, infoHash string) (*PeerConn, error) {
+	conn, err := net.Dial("tcp", peer.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to peer: %w", err)
+	}
+
+	pc := &PeerConn{
+		conn: conn,
+		peer: peer,
+	}
+
+	// Set 20th bit from right to 1 to indicate that we support the extension protocol
+	pc.id, err = pc.handshake(infoHash, &[8]byte{0, 0, 0, 0, 0, 0x10, 0, 0})
 	if err != nil {
 		return nil, fmt.Errorf("failed to handshake with peer: %w", err)
 	}
@@ -178,9 +201,10 @@ func verifyPiece(got []byte, expected string) error {
 }
 
 // handshake performs the handshake with the peer and returns the peer ID
-// received in the handshake response message
-func (pc *PeerConn) handshake(mf *MetaFile) (peerID string, err error) {
-	handshakeMsg, err := mf.HandshakeMsg()
+// received in the handshake response message. The reservedBytes parameter
+// is optional and can be used to set the reserved bytes in the handshake message.
+func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID string, err error) {
+	handshakeMsg, err := HandshakeMsg(infoHash, reservedBytes)
 	if err != nil {
 		err = fmt.Errorf("failed to create handshake message: %v", err)
 		return

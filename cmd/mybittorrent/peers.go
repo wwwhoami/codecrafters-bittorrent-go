@@ -74,7 +74,7 @@ func parsePeers(peersInfo string) ([]Peer, error) {
 // DiscoverPeers sends a request to the tracker to discover peers.
 // The returned response is a list of peer IP addresses and ports.
 func DiscoverPeers(mf *MetaFile) (peers []Peer, err error) {
-	body, err := requestTracker(mf)
+	body, err := requestTracker(mf.Announce, mf.Info.Hash, mf.Info.Length)
 	if err != nil {
 		return
 	}
@@ -99,13 +99,9 @@ func DiscoverPeers(mf *MetaFile) (peers []Peer, err error) {
 }
 
 // requestTracker sends a request to the tracker to discover peers.
+// The request includes the info hash and the file length.
 // The returned response is a bencoded dictionary with the peers info.
-func requestTracker(mf *MetaFile) ([]byte, error) {
-	infoHash, err := mf.Info.Sha1Sum()
-	if err != nil {
-		return nil, err
-	}
-
+func requestTracker(announce, infoHash string, fileLength int) ([]byte, error) {
 	peerId, err := GenRandStr(20)
 	if err != nil {
 		return nil, err
@@ -117,10 +113,12 @@ func requestTracker(mf *MetaFile) ([]byte, error) {
 	query.Add("port", "6881")
 	query.Add("uploaded", "0")
 	query.Add("downloaded", "0")
-	query.Add("left", strconv.Itoa(mf.Info.Length))
+	query.Add("left", strconv.Itoa(fileLength))
 	query.Add("compact", "1")
 
-	url := mf.Announce + "?" + query.Encode()
+	url := announce + "?" + query.Encode()
+
+	fmt.Printf("Requesting tracker: %v\n", url)
 
 	resp, err := http.Get(url)
 	if err != nil {

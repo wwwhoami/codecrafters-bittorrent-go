@@ -33,6 +33,7 @@ func parseMagnetLink(magnetLink string) (infoHash, filename, trackerURL string, 
 		return
 	}
 
+	// Unescape the tracker URL
 	trackerURL, err = url.QueryUnescape(trackerURL)
 	if err != nil {
 		err = fmt.Errorf("failed to unescape tracker URL: %v", err)
