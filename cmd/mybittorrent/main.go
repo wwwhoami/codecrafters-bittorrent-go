@@ -89,8 +89,6 @@ func magnetHandshakeCommand() error {
 		return fmt.Errorf("failed to parse peers: %v", err)
 	}
 
-	fmt.Printf("Peers Discovered:\n%v\n", peers)
-
 	peer := peers[0]
 
 	pc, err := NewPeerConnWithExtension(peer, infoHash)

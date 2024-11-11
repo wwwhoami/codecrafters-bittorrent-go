@@ -1,5 +1,10 @@
 [
   {
+    "slug": "xi4",
+    "tester_log_prefix": "xi4",
+    "title": "Send extension handshake"
+  },
+  {
     "slug": "pk2",
     "tester_log_prefix": "pk2",
     "title": "Announce extension support"

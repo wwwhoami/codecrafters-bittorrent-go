@@ -74,7 +74,7 @@ func NewPeerConnWithExtension(peer Peer, infoHash string) (*PeerConn, error) {
 // including sending bitfield, interested, and unchoke messages
 func (pc *PeerConn) PreDownload() error {
 	// get bitfield message
-	peerMsg, err := pc.waitForPeerMsg(msgBitfield)
+	peerMsg, err := pc.waitForPeerMsg(MsgBitfield)
 	if err != nil {
 		return fmt.Errorf("failed to read bitfield message: %v", err)
 	}
@@ -82,7 +82,7 @@ func (pc *PeerConn) PreDownload() error {
 	log.Printf("GOT BITFIELD message: %v\n", peerMsg)
 
 	// send interested message
-	msg := NewPeerMsg(msgInterested, nil)
+	msg := NewPeerMsg(MsgInterested, nil)
 	if err := pc.sendPeerMsg(msg); err != nil {
 		return fmt.Errorf("failed to send interested message: %v", err)
 	}
@@ -154,13 +154,13 @@ func (pc *PeerConn) DownloadPiece(mf *MetaFile, pieceIdx int) ([]byte, error) {
 		for j := 0; j < effectivePipeline; j++ {
 			req := blockReqs[i+j]
 
-			if err := pc.sendPeerMsg(NewPeerMsg(msgRequest, req.MarshalBinary())); err != nil {
+			if err := pc.sendPeerMsg(NewPeerMsg(MsgRequest, req.MarshalBinary())); err != nil {
 				return nil, fmt.Errorf("failed to send request message: %w", err)
 			}
 		}
 
 		for j := 0; j < effectivePipeline; j++ {
-			msg, err := pc.waitForPeerMsg(msgPiece)
+			msg, err := pc.waitForPeerMsg(MsgPiece)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get piece response: %w", err)
 			}
@@ -225,7 +225,46 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 
 	log.Printf("Handshake successful with peer ID: %x\n", peerID)
 
+	reserved := rcvHandshake[20:28]
+
+	// Check if the peer supports the extension protocol
+	// (if the 20th bit from the right is set to 1)
+	if reserved[5]&0x10 != 0 {
+		err = pc.extensionHandshake()
+	}
+
 	return
+}
+
+func createExtensionHandshakePayload() ([]byte, error) {
+	payloadMap := map[string]any{
+		"m": map[string]any{
+			"ut_metadata": 1,
+			"ut_pex":      2,
+		},
+	}
+
+	bencodedPayloadStr, err := bencodeDict(payloadMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bencode extension handshake payload: %v", err)
+	}
+
+	var extMsgId byte = 0
+
+	bencodedPayload := []byte(bencodedPayloadStr)
+	bencodedPayload = append([]byte{extMsgId}, bencodedPayload...)
+
+	return bencodedPayload, nil
+}
+
+func (pc *PeerConn) extensionHandshake() (err error) {
+	bencodedPayload, err := createExtensionHandshakePayload()
+	if err != nil {
+		return err
+	}
+
+	msg := NewPeerMsg(MsgExtensionHandshake, bencodedPayload)
+	return pc.sendPeerMsg(msg)
 }
 
 func sendHandshake(conn net.Conn, handshakeMsg []byte) error {

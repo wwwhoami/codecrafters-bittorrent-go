@@ -8,15 +8,16 @@ import (
 type MsgID uint8
 
 const (
-	MsgChoke         MsgID = 0
-	MsgUnchoke       MsgID = 1
-	msgInterested    MsgID = 2
-	msgNotInterested MsgID = 3
-	msgHave          MsgID = 4
-	msgBitfield      MsgID = 5
-	msgRequest       MsgID = 6
-	msgPiece         MsgID = 7
-	msgCancel        MsgID = 8
+	MsgChoke              MsgID = 0
+	MsgUnchoke            MsgID = 1
+	MsgInterested         MsgID = 2
+	MsgNotInterested      MsgID = 3
+	MsgHave               MsgID = 4
+	MsgBitfield           MsgID = 5
+	MsgRequest            MsgID = 6
+	MsgPiece              MsgID = 7
+	MsgCancel             MsgID = 8
+	MsgExtensionHandshake MsgID = 20
 )
 
 type PeerMsg struct {
@@ -49,7 +50,7 @@ func NewPeerMsgFromBytes(data []byte) (*PeerMsg, error) {
 }
 
 func (p PeerMsg) String() string {
-	if p.id == msgRequest {
+	if p.id == MsgRequest {
 		payload := RequestPayload{}
 		if err := payload.UnmarshalBinary(p.payload); err == nil {
 			return fmt.Sprintf("PeerMsg{length: %v, id: %v, payload: %+v}", p.length, p.id, payload)
