@@ -170,3 +170,56 @@ func (p *PiecePayload) UnmarshalBinary(data []byte) error {
 
 	return nil
 }
+
+type ExtMsgID uint8
+
+const (
+	// ExtMsgHandshake is a extension handshake message ID
+	ExtMsgHandshake ExtMsgID = 0
+)
+
+type ExtensionPayload struct {
+	payload map[string]any
+	// The identifier can refer to a specific extension type
+	id ExtMsgID
+}
+
+func NewExtensionPayload(id ExtMsgID, payload map[string]any) *ExtensionPayload {
+	return &ExtensionPayload{id: id, payload: payload}
+}
+
+func (e *ExtensionPayload) String() string {
+	return fmt.Sprintf("ExtensionPayload{id: %v, payload: %+v}", e.id, e.payload)
+}
+
+func (e *ExtensionPayload) MarshalBinary() ([]byte, error) {
+	payload := make([]byte, 0, len(e.payload)+1)
+
+	bencodedPayload, err := bencodeDict(e.payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bencode extension payload: %v", err)
+	}
+
+	payload = append(payload, byte(e.id))
+	payload = append(payload, bencodedPayload...)
+
+	return payload, nil
+}
+
+func (e *ExtensionPayload) UnmarshalBinary(data []byte) error {
+	if len(data) < 1 {
+		return fmt.Errorf("invalid extension payload length")
+	}
+
+	e.id = ExtMsgID(data[0])
+
+	payload := data[1:]
+	decodedPayload, err := decodeBencode(string(payload))
+	if err != nil {
+		return fmt.Errorf("failed to decode extension payload: %v", err)
+	}
+
+	e.payload = decodedPayload.(map[string]any)
+
+	return nil
+}

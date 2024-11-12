@@ -21,9 +21,10 @@ const (
 
 // PeerConn manages the connection to a peer
 type PeerConn struct {
-	conn net.Conn
-	id   string
-	peer Peer
+	conn        net.Conn
+	extensionID *uint8
+	id          string
+	peer        Peer
 }
 
 // NewPeerConn creates a new connection to the peer and performs the handshake
@@ -183,6 +184,12 @@ func (pc *PeerConn) DownloadPiece(mf *MetaFile, pieceIdx int) ([]byte, error) {
 	return pieceData, verifyPiece(pieceData, expectedHash)
 }
 
+// ExtensionID returns the extension ID of the peer connection if it was
+// established, and a boolean indicating if the extension ID was set.
+func (pc *PeerConn) ExtensionID() (uint8, bool) {
+	return *pc.extensionID, pc.extensionID != nil
+}
+
 // Close closes the peer connection
 func (pc *PeerConn) Close() error {
 	return pc.conn.Close()
@@ -230,41 +237,58 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 	// Check if the peer supports the extension protocol
 	// (if the 20th bit from the right is set to 1)
 	if reserved[5]&0x10 != 0 {
-		err = pc.extensionHandshake()
+		extensionID, err := pc.extensionHandshake()
+		pc.extensionID = &extensionID
+
+		return peerID, err
 	}
 
 	return
 }
 
-func createExtensionHandshakePayload() ([]byte, error) {
-	payloadMap := map[string]any{
+// extensionHandshake performs the extension handshake with the peer
+// and returns the extension ID of the peer if successful.
+func (pc *PeerConn) extensionHandshake() (peerExtID uint8, err error) {
+	extensionPayload := NewExtensionPayload(ExtMsgHandshake, map[string]any{
 		"m": map[string]any{
 			"ut_metadata": 1,
 			"ut_pex":      2,
 		},
-	}
+	})
 
-	bencodedPayloadStr, err := bencodeDict(payloadMap)
+	payload, err := extensionPayload.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("failed to bencode extension handshake payload: %v", err)
+		err = fmt.Errorf("failed to marshal extension payload: %v", err)
+		return
 	}
 
-	var extMsgId byte = 0
+	msg := NewPeerMsg(MsgExtensionHandshake, payload)
+	if err = pc.sendPeerMsg(msg); err != nil {
+		err = fmt.Errorf("failed to send extension handshake message: %v", err)
+		return
+	}
 
-	bencodedPayload := []byte(bencodedPayloadStr)
-	bencodedPayload = append([]byte{extMsgId}, bencodedPayload...)
-
-	return bencodedPayload, nil
-}
-
-func (pc *PeerConn) extensionHandshake() (err error) {
-	bencodedPayload, err := createExtensionHandshakePayload()
+	resMsg, err := pc.waitForPeerMsg(MsgExtensionHandshake)
 	if err != nil {
-		return err
+		err = fmt.Errorf("failed to receive extension handshake response: %v", err)
+		return
 	}
 
-	msg := NewPeerMsg(MsgExtensionHandshake, bencodedPayload)
-	return pc.sendPeerMsg(msg)
+	resPayload := &ExtensionPayload{}
+	if err = resPayload.UnmarshalBinary(resMsg.payload); err != nil {
+		err = fmt.Errorf("failed to unmarshal extension handshake response: %v", err)
+		return
+	}
+
+	utMetadata, ok := resPayload.payload["m"].(map[string]any)["ut_metadata"].(int)
+	if !ok {
+		err = fmt.Errorf("missing ut_metadata extension in handshake response")
+		return
+	}
+
+	peerExtID = uint8(utMetadata)
+
+	return
 }
 
 func sendHandshake(conn net.Conn, handshakeMsg []byte) error {
@@ -376,13 +400,14 @@ func (pc *PeerConn) waitForPeerMsg(expectedID MsgID) (*PeerMsg, error) {
 				}
 
 				// Log other message types
-				log.Printf("GOT message: %v while waiting for type %d\n", msg, expectedID)
+				log.Printf("GOT: %v while waiting for type %d\n", msg, expectedID)
 			}
 		}
 	}()
 
 	select {
 	case msg := <-msgChan:
+		log.Printf("GOT: %v\n", msg)
 		return msg, nil
 	case err := <-errChan:
 		if err == context.DeadlineExceeded {

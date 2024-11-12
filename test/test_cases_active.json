@@ -1,5 +1,10 @@
 [
   {
+    "slug": "jk6",
+    "tester_log_prefix": "jk6",
+    "title": "Receive extension handshake"
+  },
+  {
     "slug": "xi4",
     "tester_log_prefix": "xi4",
     "title": "Send extension handshake"

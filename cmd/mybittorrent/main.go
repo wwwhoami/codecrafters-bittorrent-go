@@ -96,7 +96,13 @@ func magnetHandshakeCommand() error {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
 
+	peerExtensionID, ok := pc.ExtensionID()
+	if !ok {
+		return fmt.Errorf("peer doesn't support extension protocol")
+	}
+
 	fmt.Printf("Peer ID: %x\n", pc.id)
+	fmt.Printf("Peer Metadata Extension ID: %v\n", peerExtensionID)
 
 	return err
 }
