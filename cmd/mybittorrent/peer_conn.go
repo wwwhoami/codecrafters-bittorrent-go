@@ -74,14 +74,6 @@ func NewPeerConnWithExtension(peer Peer, infoHash string) (*PeerConn, error) {
 // PreDownload performs the setup for downloading a file from a peer connection
 // including sending bitfield, interested, and unchoke messages
 func (pc *PeerConn) PreDownload() error {
-	// get bitfield message
-	peerMsg, err := pc.waitForPeerMsg(MsgBitfield)
-	if err != nil {
-		return fmt.Errorf("failed to read bitfield message: %v", err)
-	}
-
-	log.Printf("GOT BITFIELD message: %v\n", peerMsg)
-
 	// send interested message
 	msg := NewPeerMsg(MsgInterested, nil)
 	if err := pc.sendPeerMsg(msg); err != nil {
@@ -89,7 +81,7 @@ func (pc *PeerConn) PreDownload() error {
 	}
 
 	// get unchoke message
-	peerMsg, err = pc.waitForPeerMsg(MsgUnchoke)
+	peerMsg, err := pc.waitForPeerMsg(MsgUnchoke)
 	if err != nil {
 		return fmt.Errorf("failed to get unchoke message: %v", err)
 	}
@@ -225,6 +217,11 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 	rcvHandshake, err := receiveHandshake(pc.conn)
 	if err != nil {
 		err = fmt.Errorf("failed to receive handshake response: %v", err)
+		return
+	}
+
+	if _, err = pc.waitForPeerMsg(MsgBitfield); err != nil {
+		err = fmt.Errorf("failed to receive bitfield message: %v", err)
 		return
 	}
 

@@ -1,5 +1,10 @@
 [
   {
+    "slug": "ns5",
+    "tester_log_prefix": "ns5",
+    "title": "Request metadata"
+  },
+  {
     "slug": "jk6",
     "tester_log_prefix": "jk6",
     "title": "Receive extension handshake"

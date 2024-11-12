@@ -44,9 +44,84 @@ func processCommand(command string) error {
 		return magnetParseCommand()
 	case "magnet_handshake":
 		return magnetHandshakeCommand()
+	case "magnet_info":
+		return magnetInfoCommand()
 	default:
 		return fmt.Errorf("unknown command: %v", command)
 	}
+}
+
+func magnetInfoCommand() error {
+	if len(os.Args) < 3 {
+		return fmt.Errorf("not enough arguments: expected 'mybittorrent magnet_info <magnet_link>'")
+	}
+
+	magnetLink := os.Args[2]
+
+	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	if err != nil {
+		return fmt.Errorf("failed to parse magnet link: %v", err)
+	}
+
+	// Convert the info hash from hex to binary
+	infoHashHex, err := hex.DecodeString(infoHash)
+	if err != nil {
+		return fmt.Errorf("failed to decode info hash: %v", err)
+	}
+
+	infoHash = string(infoHashHex)
+
+	body, err := requestTracker(trackerURL, infoHash, 1)
+	if err != nil {
+		return fmt.Errorf("failed to request tracker: %v", err)
+	}
+
+	trackerInfo, err := decodeBencode(string(body))
+	if err != nil {
+		return fmt.Errorf("failed to decode tracker response: %v", err)
+	}
+
+	peersInfoBencoded, ok := trackerInfo.(map[string]any)["peers"].(string)
+	if !ok {
+		return fmt.Errorf("invalid peers info")
+	}
+
+	peers, err := parsePeers(peersInfoBencoded)
+	if err != nil {
+		return fmt.Errorf("failed to parse peers: %v", err)
+	}
+
+	peer := peers[0]
+
+	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	if err != nil {
+		return fmt.Errorf("failed to create peer connection: %v", err)
+	}
+
+	peerExtensionID, ok := pc.ExtensionID()
+	if !ok {
+		return fmt.Errorf("peer doesn't support extension protocol")
+	}
+
+	fmt.Printf("Peer ID: %x\n", pc.id)
+	fmt.Printf("Peer Metadata Extension ID: %v\n", peerExtensionID)
+
+	extReq := NewExtensionPayload(ExtMsgID(peerExtensionID), map[string]any{
+		"msg_type": int(ExtMsgRequest),
+		"piece":    0,
+	})
+
+	extReqData, err := extReq.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to marshal extension request: %v", err)
+	}
+
+	msg := NewPeerMsg(MsgExtensionHandshake, extReqData)
+	if err := pc.sendPeerMsg(msg); err != nil {
+		return fmt.Errorf("failed to send extension request: %v", err)
+	}
+
+	return err
 }
 
 func magnetHandshakeCommand() error {

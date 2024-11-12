@@ -173,9 +173,16 @@ func (p *PiecePayload) UnmarshalBinary(data []byte) error {
 
 type ExtMsgID uint8
 
+// ExtMsgHandshake is a extension handshake message ID
+const ExtMsgHandshake ExtMsgID = 0
+
 const (
-	// ExtMsgHandshake is a extension handshake message ID
-	ExtMsgHandshake ExtMsgID = 0
+	// ExtMsgRequest is a extension message ID for a request for a piece of metadata
+	ExtMsgRequest ExtMsgID = 0
+	// ExtMsgData is a extension message ID for sending a piece of metadata
+	ExtMsgData ExtMsgID = 1
+	// ExtMsgReject is a extension message ID for rejecting a request for a piece of metadata
+	ExtMsgReject ExtMsgID = 2
 )
 
 type ExtensionPayload struct {
