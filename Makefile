@@ -12,6 +12,10 @@ audit:
 	@echo "Linting code..."
 	-golangci-lint run
 
+build:
+	@echo "Building..."
+	go build -o bin/ ./...
+
 test:
 	@echo "Running tests..."
 	./test.sh
