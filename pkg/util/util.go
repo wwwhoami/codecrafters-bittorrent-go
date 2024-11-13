@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"os"
 )
 
 // GenRandStr generates a random string of the specified length.
@@ -43,4 +44,20 @@ func GetIntFromMap(m map[string]any, key string) (int, error) {
 		return value, nil
 	}
 	return 0, fmt.Errorf("invalid %s", key)
+}
+
+// WriteToOut writes the data to the output file,
+// truncating the file if it already exists.
+func WriteToOut(outFile string, data []byte) error {
+	file, err := os.Create(outFile)
+	if err != nil {
+		return fmt.Errorf("failed to create piece output file: %v", err)
+	}
+	defer file.Close()
+
+	if _, err = file.Write(data); err != nil {
+		return fmt.Errorf("failed to write data to file: %v", err)
+	}
+
+	return nil
 }
