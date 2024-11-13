@@ -1,8 +1,10 @@
-package main
+package bencode
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -168,8 +170,28 @@ func decodeValue(r *bufio.Reader) (any, error) {
 	}
 }
 
-func decodeBencode(bencode string) (any, error) {
+// DecodeReader decodes a bencoded value from a reader.
+func DecodeReader(r io.Reader) (any, error) {
+	br := bufio.NewReader(r)
+
+	return decodeValue(br)
+}
+
+// DecodeBufReader decodes a bencoded value from a buffered reader.
+func DecodeBufReader(r *bufio.Reader) (any, error) {
+	return decodeValue(r)
+}
+
+// DecodeStr decodes a bencoded string.
+func DecodeStr(bencode string) (any, error) {
 	r := bufio.NewReader(strings.NewReader(bencode))
+
+	return decodeValue(r)
+}
+
+// DecodeBytes decodes a bencoded byte slice.
+func DecodeBytes(bencode []byte) (any, error) {
+	r := bufio.NewReader(bytes.NewReader(bencode))
 
 	return decodeValue(r)
 }
@@ -194,7 +216,7 @@ func bencodeList(l []any) (string, error) {
 	res.WriteString("l")
 
 	for _, v := range l {
-		val, err := bencodeVal(v)
+		val, err := BencodeVal(v)
 		if err != nil {
 			return "", err
 		}
@@ -229,7 +251,7 @@ func bencodeDict(d map[string]any) (string, error) {
 		res.WriteString(bencodeString(k))
 
 		v := d[k]
-		val, err := bencodeVal(v)
+		val, err := BencodeVal(v)
 		if err != nil {
 			return "", err
 		}
@@ -242,9 +264,9 @@ func bencodeDict(d map[string]any) (string, error) {
 	return res.String(), nil
 }
 
-// bencodeVal encodes a value into a bencoded value.
+// BencodeVal encodes a value into a bencoded value.
 // The value can be a string, integer, list or dictionary.
-func bencodeVal(v any) (string, error) {
+func BencodeVal(v any) (string, error) {
 	switch v := v.(type) {
 	case string:
 		return bencodeString(v), nil

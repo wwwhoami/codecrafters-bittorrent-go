@@ -1,11 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"crypto/sha1"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
 )
 
 // MetaInfo represents the metadata information of a torrent file.
@@ -46,7 +47,7 @@ func NewMetaInfoFromMap(m map[string]any) (mi *MetaInfo, err error) {
 }
 
 func (mi *MetaInfo) Bencode() (string, error) {
-	return bencodeDict(map[string]any{
+	return bencode.BencodeVal(map[string]any{
 		"length":       mi.Length,
 		"name":         mi.Name,
 		"piece length": mi.PieceLength,
@@ -120,14 +121,17 @@ func ParseMetaFile(filename string) (*MetaFile, error) {
 
 	defer file.Close()
 
-	r := bufio.NewReader(file)
-
-	decoded, err := decodeDict(r)
+	decoded, err := bencode.DecodeReader(file)
 	if err != nil {
 		return nil, err
 	}
 
-	metafile, err := NewMetaFileFromMap(decoded)
+	decodedMap, ok := decoded.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid .torrent file")
+	}
+
+	metafile, err := NewMetaFileFromMap(decodedMap)
 
 	return metafile, err
 }

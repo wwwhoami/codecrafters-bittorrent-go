@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
 )
 
 func main() {
@@ -110,8 +112,6 @@ func parseMagnetDownloadArgs() (outFile, magnetLink string, err error) {
 		err = fmt.Errorf("not enough arguments: expected 'mybittorrent download -o <out_file> <magnet_link>'")
 		return
 	}
-
-	fmt.Printf("Args: %v\n", os.Args)
 
 	outFile, magnetLink = os.Args[3], os.Args[4]
 	if magnetLink == "" {
@@ -288,6 +288,7 @@ func magnetHandshakeCommand() error {
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
+	defer pc.Close()
 
 	peerExtensionID, ok := pc.ExtensionID()
 	if !ok {
@@ -353,8 +354,6 @@ func parseDownloadArgs() (outFile, filename string, err error) {
 		err = fmt.Errorf("not enough arguments: expected 'mybittorrent download -o <out_file> <torrent_file>'")
 		return
 	}
-
-	fmt.Printf("Args: %v\n", os.Args)
 
 	outFile, filename = os.Args[3], os.Args[4]
 	if filename == "" {
@@ -504,7 +503,7 @@ func handshakeCommand() error {
 func decodeCommand() error {
 	bencodedValue := os.Args[2]
 
-	decoded, err := decodeBencode(bencodedValue)
+	decoded, err := bencode.DecodeStr(bencodedValue)
 	if err != nil {
 		return err
 	}

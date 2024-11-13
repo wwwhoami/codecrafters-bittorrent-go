@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
 )
 
 // GenRandStr generates a random string of the specified length.
@@ -81,7 +83,7 @@ func DiscoverPeers(announce, infoHash string, infoLength int) (peers []Peer, err
 		return
 	}
 
-	trackerInfo, err := decodeBencode(string(body))
+	trackerInfo, err := bencode.DecodeBytes((body))
 	if err != nil {
 		return
 	}

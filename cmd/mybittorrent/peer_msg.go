@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
 )
 
 type MsgID uint8
@@ -213,7 +215,7 @@ func (e *ExtensionPayload) String() string {
 func (e *ExtensionPayload) MarshalBinary() ([]byte, error) {
 	payload := make([]byte, 0, len(e.payload)+1)
 
-	bencodedPayload, err := bencodeDict(e.payload)
+	bencodedPayload, err := bencode.BencodeVal(e.payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bencode extension payload: %v", err)
 	}
@@ -236,17 +238,23 @@ func (e *ExtensionPayload) UnmarshalBinary(data []byte) error {
 	payload := data[1:]
 
 	payloadReader := bufio.NewReader(strings.NewReader(string(payload)))
-	decodedPayload, err := decodeDict(payloadReader)
+
+	decodedPayload, err := bencode.DecodeBufReader(payloadReader)
 	if err != nil {
 		return fmt.Errorf("failed to decode extension payload: %v", err)
 	}
 
-	e.payload = decodedPayload
+	decodedPayloadMap, ok := decodedPayload.(map[string]any)
+	if !ok {
+		return fmt.Errorf("invalid extension payload")
+	}
+
+	e.payload = decodedPayloadMap
 
 	// If there is any buffered data, it means there is a metadata piece
 	// attached to the extension message
 	if payloadReader.Buffered() > 0 {
-		metaPiece, err := decodeDict(payloadReader)
+		metaPiece, err := bencode.DecodeBufReader(payloadReader)
 		if err != nil {
 			return fmt.Errorf("failed to decode extension payload: %v", err)
 		}
