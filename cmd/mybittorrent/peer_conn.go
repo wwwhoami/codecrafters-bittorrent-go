@@ -116,14 +116,6 @@ func (pc *PeerConn) RequestMetadata() (metadataPiece *ExtensionPayload, err erro
 // PreDownload performs the setup for downloading a file from a peer connection
 // including sending bitfield, interested, and unchoke messages
 func (pc *PeerConn) PreDownload() error {
-	// get bitfield message
-	peerMsg, err := pc.waitForPeerMsg(MsgBitfield)
-	if err != nil {
-		return fmt.Errorf("failed to read bitfield message: %v", err)
-	}
-
-	log.Printf("GOT BITFIELD message: %v\n", peerMsg)
-
 	// send interested message
 	msg := NewPeerMsg(MsgInterested, nil)
 	if err := pc.sendPeerMsg(msg); err != nil {
@@ -131,7 +123,7 @@ func (pc *PeerConn) PreDownload() error {
 	}
 
 	// get unchoke message
-	peerMsg, err = pc.waitForPeerMsg(MsgUnchoke)
+	peerMsg, err := pc.waitForPeerMsg(MsgUnchoke)
 	if err != nil {
 		return fmt.Errorf("failed to get unchoke message: %v", err)
 	}

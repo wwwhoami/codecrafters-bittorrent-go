@@ -1,5 +1,10 @@
 [
   {
+    "slug": "qv6",
+    "tester_log_prefix": "qv6",
+    "title": "Download a piece"
+  },
+  {
     "slug": "zh1",
     "tester_log_prefix": "zh1",
     "title": "Receive matadata"

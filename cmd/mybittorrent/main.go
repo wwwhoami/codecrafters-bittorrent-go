@@ -45,9 +45,99 @@ func processCommand(command string) error {
 		return magnetHandshakeCommand()
 	case "magnet_info":
 		return magnetInfoCommand()
+	case "magnet_download_piece":
+		return magnetDownloadPieceCommand()
 	default:
 		return fmt.Errorf("unknown command: %v", command)
 	}
+}
+
+func magnetDownloadPieceCommand() error {
+	outFile, magnetLink, pieceIdx, err := parseMagnetDownloadPieceArgs()
+	if err != nil {
+		return fmt.Errorf("failed to parse download piece args: %v", err)
+	}
+
+	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	if err != nil {
+		return fmt.Errorf("failed to parse magnet link: %v", err)
+	}
+
+	peersInfo, err := DiscoverPeers(trackerURL, infoHash, 1)
+	if err != nil {
+		return fmt.Errorf("failed to discover peers: %v", err)
+	}
+	peer := peersInfo[0]
+
+	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	if err != nil {
+		return fmt.Errorf("failed to create peer connection: %v", err)
+	}
+
+	metadataPiece, err := pc.RequestMetadata()
+	if err != nil {
+		return fmt.Errorf("failed to request metadata: %v", err)
+	}
+
+	mf, err := NewMetaFileFromMap(map[string]any{
+		"announce": trackerURL,
+		"info":     metadataPiece.payload["meta_piece"],
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create metafile: %v", err)
+	}
+
+	if err := pc.PreDownload(); err != nil {
+		return fmt.Errorf("failed to prepare download: %v", err)
+	}
+
+	// download piece
+	data, err := pc.DownloadPiece(mf, pieceIdx)
+	if err != nil {
+		return fmt.Errorf("failed to download piece: %v", err)
+	}
+
+	// write piece data to file
+	if err := writeToOut(outFile, data); err != nil {
+		fmt.Printf("failed to write piece data to file: %v\n", err)
+	}
+
+	fmt.Printf("Piece downloaded to: %v\n", outFile)
+
+	return nil
+}
+
+func parseMagnetDownloadPieceArgs() (pieceOutFile, magnetLink string, pieceIdx int, err error) {
+	if len(os.Args) < 6 {
+		err = fmt.Errorf("not enough arguments: expexted 'mybittorrent magnet_download_piece -o <out_file> <magnet_link> <piece_idx>'")
+		return
+	}
+
+	pieceOutFile, magnetLink, pieceIdxStr := os.Args[3], os.Args[4], os.Args[5]
+	if magnetLink == "" || pieceIdxStr == "" {
+		err = fmt.Errorf("not enough arguments")
+		return
+	}
+
+	pieceIdx, err = strconv.Atoi(pieceIdxStr)
+	if err != nil {
+		err = fmt.Errorf("failed to parse piece index: %v", err)
+		return
+	}
+
+	pieceOutPath := pieceOutFile[:strings.LastIndex(pieceOutFile, "/")]
+
+	// Create piece output file directory if it doesn't exist
+	if _, err = os.Stat(pieceOutFile); err != nil {
+		fmt.Printf("Piece output directory doesn't exist, creating dir: %v\n", pieceOutPath)
+
+		if err = os.MkdirAll(pieceOutPath, os.ModePerm); err != nil {
+			err = fmt.Errorf("failed to create piece output directory: %v", err)
+			return
+		}
+	}
+
+	return
 }
 
 func magnetInfoCommand() error {
@@ -176,7 +266,7 @@ func downloadCommand() error {
 
 func parseDownloadArgs() (outFile, filename string, err error) {
 	if len(os.Args) < 5 {
-		err = fmt.Errorf("not enough arguments")
+		err = fmt.Errorf("not enough arguments: expected 'mybittorrent download -o <out_file> <torrent_file>'")
 		return
 	}
 
@@ -266,7 +356,7 @@ func writeToOut(outFile string, data []byte) error {
 
 func parseDownloadPieceArgs() (pieceOutFile string, filename string, pieceIdx int, err error) {
 	if len(os.Args) < 6 {
-		err = fmt.Errorf("not enough arguments")
+		err = fmt.Errorf("not enough arguments: expexted 'mybittorrent download_piece -o <out_file> <torrent_file> <piece_idx>'")
 		return
 	}
 
