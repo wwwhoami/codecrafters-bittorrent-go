@@ -20,7 +20,7 @@ Go solution to the ["Build Your Own BitTorrent" Challenge](https://app.codecraft
 1. Clone the repository:
 
    ```sh
-   git clone https://github.com/yourusername/bittorrent-go.git
+   git clone https://github.com/wwwhoami/codecrafters-bittorrent-go.git
    cd bittorrent-go
    ```
 
