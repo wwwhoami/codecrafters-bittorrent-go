@@ -15,7 +15,7 @@ type Torrent struct {
 }
 
 func NewTorrent(mf *MetaFile) (*Torrent, error) {
-	peersInfo, err := DiscoverPeers(mf)
+	peersInfo, err := DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover peers: %v", err)
 	}

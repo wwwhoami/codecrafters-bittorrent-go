@@ -71,9 +71,59 @@ func NewPeerConnWithExtension(peer Peer, infoHash string) (*PeerConn, error) {
 	return pc, nil
 }
 
+// RequestMetadata requests the metadata from the peer connection
+// using the bittorrent extension protocol and returns the metadata piece.
+func (pc *PeerConn) RequestMetadata() (metadataPiece *ExtensionPayload, err error) {
+	peerExtensionID, ok := pc.ExtensionID()
+	if !ok {
+		err = fmt.Errorf("peer doesn't support extension protocol")
+		return
+	}
+
+	// Send metadata request
+	extReq := NewExtensionPayload(ExtMsgID(peerExtensionID), map[string]any{
+		"msg_type": int(ExtMsgRequest),
+		"piece":    0,
+	})
+	extReqData, err := extReq.MarshalBinary()
+	if err != nil {
+		err = fmt.Errorf("failed to marshal extension request: %v", err)
+		return
+	}
+
+	msg := NewPeerMsg(MsgExtensionHandshake, extReqData)
+	if err = pc.sendPeerMsg(msg); err != nil {
+		err = fmt.Errorf("failed to send extension request: %v", err)
+		return
+	}
+
+	// Receive metadata piece
+	metadataMsg, err := pc.waitForPeerMsg(MsgExtensionHandshake)
+	if err != nil {
+		err = fmt.Errorf("failed to receive metadata message: %v", err)
+		return
+	}
+
+	metadataPiece, err = NewExtensionPayloadFromBytes(metadataMsg.payload)
+	if err != nil {
+		err = fmt.Errorf("failed to create metadata piece: %v", err)
+		return
+	}
+
+	return
+}
+
 // PreDownload performs the setup for downloading a file from a peer connection
 // including sending bitfield, interested, and unchoke messages
 func (pc *PeerConn) PreDownload() error {
+	// get bitfield message
+	peerMsg, err := pc.waitForPeerMsg(MsgBitfield)
+	if err != nil {
+		return fmt.Errorf("failed to read bitfield message: %v", err)
+	}
+
+	log.Printf("GOT BITFIELD message: %v\n", peerMsg)
+
 	// send interested message
 	msg := NewPeerMsg(MsgInterested, nil)
 	if err := pc.sendPeerMsg(msg); err != nil {
@@ -81,7 +131,7 @@ func (pc *PeerConn) PreDownload() error {
 	}
 
 	// get unchoke message
-	peerMsg, err := pc.waitForPeerMsg(MsgUnchoke)
+	peerMsg, err = pc.waitForPeerMsg(MsgUnchoke)
 	if err != nil {
 		return fmt.Errorf("failed to get unchoke message: %v", err)
 	}
@@ -220,11 +270,6 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 		return
 	}
 
-	if _, err = pc.waitForPeerMsg(MsgBitfield); err != nil {
-		err = fmt.Errorf("failed to receive bitfield message: %v", err)
-		return
-	}
-
 	peerID = string(rcvHandshake[48:])
 
 	log.Printf("Handshake successful with peer ID: %x\n", peerID)
@@ -246,6 +291,11 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 // extensionHandshake performs the extension handshake with the peer
 // and returns the extension ID of the peer if successful.
 func (pc *PeerConn) extensionHandshake() (peerExtID uint8, err error) {
+	if _, err = pc.waitForPeerMsg(MsgBitfield); err != nil {
+		err = fmt.Errorf("failed to receive bitfield message: %v", err)
+		return
+	}
+
 	extensionPayload := NewExtensionPayload(ExtMsgHandshake, map[string]any{
 		"m": map[string]any{
 			"ut_metadata": 1,

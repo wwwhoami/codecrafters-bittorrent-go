@@ -1,5 +1,10 @@
 [
   {
+    "slug": "zh1",
+    "tester_log_prefix": "zh1",
+    "title": "Receive matadata"
+  },
+  {
     "slug": "ns5",
     "tester_log_prefix": "ns5",
     "title": "Request metadata"

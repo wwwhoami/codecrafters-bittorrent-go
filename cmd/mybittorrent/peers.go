@@ -72,9 +72,11 @@ func parsePeers(peersInfo string) ([]Peer, error) {
 }
 
 // DiscoverPeers sends a request to the tracker to discover peers.
+// Announce is the URL of the tracker, infoHash is the SHA1 hash of the torrent file,
+// and infoLength is the length of the file.
 // The returned response is a list of peer IP addresses and ports.
-func DiscoverPeers(mf *MetaFile) (peers []Peer, err error) {
-	body, err := requestTracker(mf.Announce, mf.Info.Hash, mf.Info.Length)
+func DiscoverPeers(announce, infoHash string, infoLength int) (peers []Peer, err error) {
+	body, err := requestTracker(announce, infoHash, infoLength)
 	if err != nil {
 		return
 	}

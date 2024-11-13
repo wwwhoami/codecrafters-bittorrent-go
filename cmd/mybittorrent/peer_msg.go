@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 type MsgID uint8
@@ -195,6 +197,15 @@ func NewExtensionPayload(id ExtMsgID, payload map[string]any) *ExtensionPayload 
 	return &ExtensionPayload{id: id, payload: payload}
 }
 
+func NewExtensionPayloadFromBytes(data []byte) (*ExtensionPayload, error) {
+	extensionPayload := &ExtensionPayload{}
+	if err := extensionPayload.UnmarshalBinary(data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal extension payload: %v", err)
+	}
+
+	return extensionPayload, nil
+}
+
 func (e *ExtensionPayload) String() string {
 	return fmt.Sprintf("ExtensionPayload{id: %v, payload: %+v}", e.id, e.payload)
 }
@@ -218,15 +229,30 @@ func (e *ExtensionPayload) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("invalid extension payload length")
 	}
 
+	e.payload = make(map[string]any)
+
 	e.id = ExtMsgID(data[0])
 
 	payload := data[1:]
-	decodedPayload, err := decodeBencode(string(payload))
+
+	payloadReader := bufio.NewReader(strings.NewReader(string(payload)))
+	decodedPayload, err := decodeDict(payloadReader)
 	if err != nil {
 		return fmt.Errorf("failed to decode extension payload: %v", err)
 	}
 
-	e.payload = decodedPayload.(map[string]any)
+	e.payload = decodedPayload
+
+	// If there is any buffered data, it means there is a metadata piece
+	// attached to the extension message
+	if payloadReader.Buffered() > 0 {
+		metaPiece, err := decodeDict(payloadReader)
+		if err != nil {
+			return fmt.Errorf("failed to decode extension payload: %v", err)
+		}
+
+		e.payload["meta_piece"] = metaPiece
+	}
 
 	return nil
 }
