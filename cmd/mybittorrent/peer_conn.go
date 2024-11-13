@@ -269,8 +269,8 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 	reserved := rcvHandshake[20:28]
 
 	// Check if the peer supports the extension protocol
-	// (if the 20th bit from the right is set to 1)
-	if reserved[5]&0x10 != 0 {
+	// (if the 20th bit of reserved bytes response and arg from the right is set to 1)
+	if reservedBytes != nil && reservedBytes[5]&0x10 != 0 && reserved[5]&0x10 != 0 {
 		extensionID, err := pc.extensionHandshake()
 		pc.extensionID = &extensionID
 

@@ -1,5 +1,10 @@
 [
   {
+    "slug": "dv7",
+    "tester_log_prefix": "dv7",
+    "title": "Download the whole file"
+  },
+  {
     "slug": "qv6",
     "tester_log_prefix": "qv6",
     "title": "Download a piece"

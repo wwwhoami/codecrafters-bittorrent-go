@@ -47,9 +47,91 @@ func processCommand(command string) error {
 		return magnetInfoCommand()
 	case "magnet_download_piece":
 		return magnetDownloadPieceCommand()
+	case "magnet_download":
+		return magnetDownloadCommand()
 	default:
 		return fmt.Errorf("unknown command: %v", command)
 	}
+}
+
+func magnetDownloadCommand() error {
+	outFilename, magnetLink, err := parseMagnetDownloadArgs()
+	if err != nil {
+		return fmt.Errorf("failed to parse download piece args: %v", err)
+	}
+
+	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	if err != nil {
+		return fmt.Errorf("failed to parse magnet link: %v", err)
+	}
+
+	peersInfo, err := DiscoverPeers(trackerURL, infoHash, 1)
+	if err != nil {
+		return fmt.Errorf("failed to discover peers: %v", err)
+	}
+	peer := peersInfo[0]
+
+	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	if err != nil {
+		return fmt.Errorf("failed to create peer connection: %v", err)
+	}
+
+	metadataPiece, err := pc.RequestMetadata()
+	if err != nil {
+		return fmt.Errorf("failed to request metadata: %v", err)
+	}
+	pc.Close()
+
+	mf, err := NewMetaFileFromMap(map[string]any{
+		"announce": trackerURL,
+		"info":     metadataPiece.payload["meta_piece"],
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create metafile: %v", err)
+	}
+
+	torrent, err := NewTorrent(mf)
+	if err != nil {
+		return fmt.Errorf("failed to create torrent: %v", err)
+	}
+	defer torrent.Close()
+
+	if err := torrent.DownloadFile(outFilename); err != nil {
+		return fmt.Errorf("failed to download file: %v", err)
+	}
+
+	fmt.Printf("File downloaded to: %v\n", outFilename)
+
+	return nil
+}
+
+func parseMagnetDownloadArgs() (outFile, magnetLink string, err error) {
+	if len(os.Args) < 5 {
+		err = fmt.Errorf("not enough arguments: expected 'mybittorrent download -o <out_file> <magnet_link>'")
+		return
+	}
+
+	fmt.Printf("Args: %v\n", os.Args)
+
+	outFile, magnetLink = os.Args[3], os.Args[4]
+	if magnetLink == "" {
+		err = fmt.Errorf("not enough arguments")
+		return
+	}
+
+	pieceOutPath := outFile[:strings.LastIndex(outFile, "/")]
+
+	// Create piece output file directory if it doesn't exist
+	if _, err = os.Stat(outFile); err != nil {
+		fmt.Printf("Piece output directory doesn't exist, creating dir: %v\n", pieceOutPath)
+
+		if err = os.MkdirAll(pieceOutPath, os.ModePerm); err != nil {
+			err = fmt.Errorf("failed to create piece output directory: %v", err)
+			return
+		}
+	}
+
+	return
 }
 
 func magnetDownloadPieceCommand() error {
@@ -73,6 +155,7 @@ func magnetDownloadPieceCommand() error {
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
+	defer pc.Close()
 
 	metadataPiece, err := pc.RequestMetadata()
 	if err != nil {
@@ -162,6 +245,7 @@ func magnetInfoCommand() error {
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
+	defer pc.Close()
 
 	metadataPiece, err := pc.RequestMetadata()
 	if err != nil {
