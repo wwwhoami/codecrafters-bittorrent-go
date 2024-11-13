@@ -1,35 +1,99 @@
-[![progress-banner](https://backend.codecrafters.io/progress/bittorrent/e3efc563-be42-4a1d-b309-f74b0fbee933)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# BitTorrent Go Implementation
 
-This is a starting point for Go solutions to the
-["Build Your Own BitTorrent" Challenge](https://app.codecrafters.io/courses/bittorrent/overview).
+This project is a BitTorrent client implementation in Go. It provides a command-line
+interface (CLI) for parsing torrent files or magnet links and downloading files
+from peers.
 
-In this challenge, you’ll build a BitTorrent client that's capable of parsing a
-.torrent file and downloading a file from a peer. Along the way, we’ll learn
-about how torrent files are structured, HTTP trackers, BitTorrent’s Peer
-Protocol, pipelining and more.
+Go solution to the ["Build Your Own BitTorrent" Challenge](https://app.codecrafters.io/courses/bittorrent/overview).
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+**Note**: Head over to [codecrafters.io](https://codecrafters.io) to try the challenge.
 
-# Passing the first stage
+## Features
 
-The entry point for your BitTorrent implementation is in
-`cmd/mybittorrent/main.go`. Study and uncomment the relevant code, and push your
-changes to pass the first stage:
+- Display torrent and magnet link information
+- Parse torrent files and magnet links
+- Discover peers
+- Download files from peers
+
+## Installation
+
+1. Clone the repository:
+
+   ```sh
+   git clone https://github.com/yourusername/bittorrent-go.git
+   cd bittorrent-go
+   ```
+
+2. Build the project:
+
+   ```sh
+   go build -o mybittorrent ./cmd/mybittorrent
+   ```
+
+   or
+
+   ```sh
+   make build
+   ```
+
+## Usage
+
+### Commands
+
+- `decode <bencoded_value>`: Decode a bencoded value and print it to stdout.
+- `info <torrent_file>`: Display information about a torrent file.
+- `peers <torrent_file>`: Discover and display peers for a torrent file.
+- `handshake <torrent_file> <peer_address>`: Perform a handshake with a peer.
+- `download_piece -o <out_file> <torrent_file> <piece_idx>`: Download a specific piece of a file from peers using a torrent file.
+- `download -o <out_file> <torrent_file>`: Download a file from peers using a torrent file.
+- `magnet_parse <magnet_link>`: Parse and display information about a magnet link.
+- `magnet_handshake <magnet_link>`: Perform a handshake with a peer using a magnet link.
+- `magnet_info <magnet_link>`: Display information about a magnet link.
+- `magnet_download_piece -o <out_file> <magnet_link> <piece_idx>`: Download a specific piece of a file from peers using a magnet link.
+- `magnet_download -o <out_file> <magnet_link>`: Download a file from peers using a magnet link.
+
+### Examples
+
+- Decode a bencoded value:
+
+  ```sh
+  ./mybittorrent decode d3:cow3:moo4:spam4:eggse
+  ```
+
+- Display information about a torrent file:
+
+  ```sh
+  ./mybittorrent info example.torrent
+  ```
+
+- Discover peers for a torrent file:
+
+  ```sh
+  ./mybittorrent peers example.torrent
+  ```
+
+- Download a file using a torrent file:
+
+  ```sh
+  ./mybittorrent download -o output_file example.torrent
+  ```
+
+- Download a file using a magnet link:
+
+  ```sh
+    ./mybittorrent magnet_download -o output_file "magnet:?xt=urn:btih:..."
+  ```
+
+## Tests
+
+To run the tests (for cases from test/test_cases_active.json), run the following:
 
 ```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+make test
 ```
 
-Time to move on to the next stage!
+Or to run all tests (for cases from test/test_cases.json), run:
 
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `go (1.19)` installed locally
-1. Run `./your_bittorrent.sh` to run your program, which is implemented in
-   `cmd/mybittorrent/main.go`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+```sh
+make test-all
+```
