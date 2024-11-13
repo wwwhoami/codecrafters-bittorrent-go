@@ -1,8 +1,6 @@
-package main
+package peer
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -12,20 +10,8 @@ import (
 	"strings"
 
 	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/util"
 )
-
-// GenRandStr generates a random string of the specified length.
-// The resulting string is base64 encoded.
-func GenRandStr(length int) (string, error) {
-	buffer := make([]byte, length)
-
-	_, err := rand.Read(buffer)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(buffer)[:length], nil
-}
 
 type Peer struct {
 	ip   string
@@ -106,7 +92,7 @@ func DiscoverPeers(announce, infoHash string, infoLength int) (peers []Peer, err
 // The request includes the info hash and the file length.
 // The returned response is a bencoded dictionary with the peers info.
 func requestTracker(announce, infoHash string, fileLength int) ([]byte, error) {
-	peerId, err := GenRandStr(20)
+	peerId, err := util.GenRandStr(20)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,10 @@ import (
 	"strings"
 
 	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/magnet"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/metainfo"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/peer"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/torrent"
 )
 
 func main() {
@@ -62,18 +66,18 @@ func magnetDownloadCommand() error {
 		return fmt.Errorf("failed to parse download piece args: %v", err)
 	}
 
-	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	infoHash, _, trackerURL, err := magnet.ParseMagnetLink(magnetLink)
 	if err != nil {
 		return fmt.Errorf("failed to parse magnet link: %v", err)
 	}
 
-	peersInfo, err := DiscoverPeers(trackerURL, infoHash, 1)
+	peersInfo, err := peer.DiscoverPeers(trackerURL, infoHash, 1)
 	if err != nil {
 		return fmt.Errorf("failed to discover peers: %v", err)
 	}
-	peer := peersInfo[0]
+	p := peersInfo[0]
 
-	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	pc, err := peer.NewPeerConnWithExtension(p, infoHash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -84,15 +88,15 @@ func magnetDownloadCommand() error {
 	}
 	pc.Close()
 
-	mf, err := NewMetaFileFromMap(map[string]any{
+	mf, err := metainfo.NewMetaFileFromMap(map[string]any{
 		"announce": trackerURL,
-		"info":     metadataPiece.payload["meta_piece"],
+		"info":     metadataPiece.Payload["meta_piece"],
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create metafile: %v", err)
 	}
 
-	torrent, err := NewTorrent(mf)
+	torrent, err := torrent.NewTorrent(mf)
 	if err != nil {
 		return fmt.Errorf("failed to create torrent: %v", err)
 	}
@@ -140,18 +144,18 @@ func magnetDownloadPieceCommand() error {
 		return fmt.Errorf("failed to parse download piece args: %v", err)
 	}
 
-	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	infoHash, _, trackerURL, err := magnet.ParseMagnetLink(magnetLink)
 	if err != nil {
 		return fmt.Errorf("failed to parse magnet link: %v", err)
 	}
 
-	peersInfo, err := DiscoverPeers(trackerURL, infoHash, 1)
+	peersInfo, err := peer.DiscoverPeers(trackerURL, infoHash, 1)
 	if err != nil {
 		return fmt.Errorf("failed to discover peers: %v", err)
 	}
-	peer := peersInfo[0]
+	p := peersInfo[0]
 
-	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	pc, err := peer.NewPeerConnWithExtension(p, infoHash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -162,9 +166,9 @@ func magnetDownloadPieceCommand() error {
 		return fmt.Errorf("failed to request metadata: %v", err)
 	}
 
-	mf, err := NewMetaFileFromMap(map[string]any{
+	mf, err := metainfo.NewMetaFileFromMap(map[string]any{
 		"announce": trackerURL,
-		"info":     metadataPiece.payload["meta_piece"],
+		"info":     metadataPiece.Payload["meta_piece"],
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create metafile: %v", err)
@@ -230,18 +234,18 @@ func magnetInfoCommand() error {
 
 	magnetLink := os.Args[2]
 
-	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	infoHash, _, trackerURL, err := magnet.ParseMagnetLink(magnetLink)
 	if err != nil {
 		return fmt.Errorf("failed to parse magnet link: %v", err)
 	}
 
-	peersInfo, err := DiscoverPeers(trackerURL, infoHash, 1)
+	peersInfo, err := peer.DiscoverPeers(trackerURL, infoHash, 1)
 	if err != nil {
 		return fmt.Errorf("failed to discover peers: %v", err)
 	}
-	peer := peersInfo[0]
+	p := peersInfo[0]
 
-	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	pc, err := peer.NewPeerConnWithExtension(p, infoHash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -252,9 +256,9 @@ func magnetInfoCommand() error {
 		return fmt.Errorf("failed to request metadata: %v", err)
 	}
 
-	mf, err := NewMetaFileFromMap(map[string]any{
+	mf, err := metainfo.NewMetaFileFromMap(map[string]any{
 		"announce": trackerURL,
-		"info":     metadataPiece.payload["meta_piece"],
+		"info":     metadataPiece.Payload["meta_piece"],
 	})
 
 	fmt.Printf("Tracker URL: %v\n", mf.Announce)
@@ -273,18 +277,18 @@ func magnetHandshakeCommand() error {
 
 	magnetLink := os.Args[2]
 
-	infoHash, _, trackerURL, err := parseMagnetLink(magnetLink)
+	infoHash, _, trackerURL, err := magnet.ParseMagnetLink(magnetLink)
 	if err != nil {
 		return fmt.Errorf("failed to parse magnet link: %v", err)
 	}
 
-	peersInfo, err := DiscoverPeers(trackerURL, infoHash, 1)
+	peersInfo, err := peer.DiscoverPeers(trackerURL, infoHash, 1)
 	if err != nil {
 		return err
 	}
-	peer := peersInfo[0]
+	p := peersInfo[0]
 
-	pc, err := NewPeerConnWithExtension(peer, infoHash)
+	pc, err := peer.NewPeerConnWithExtension(p, infoHash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -295,7 +299,7 @@ func magnetHandshakeCommand() error {
 		return fmt.Errorf("peer doesn't support extension protocol")
 	}
 
-	fmt.Printf("Peer ID: %x\n", pc.id)
+	fmt.Printf("Peer ID: %x\n", pc.ID())
 	fmt.Printf("Peer Metadata Extension ID: %v\n", peerExtensionID)
 
 	return err
@@ -308,7 +312,7 @@ func magnetParseCommand() error {
 
 	matnetLink := os.Args[2]
 
-	infoHash, filename, trackerURL, err := parseMagnetLink(matnetLink)
+	infoHash, filename, trackerURL, err := magnet.ParseMagnetLink(matnetLink)
 	if err != nil {
 		return fmt.Errorf("failed to parse magnet link: %v", err)
 	}
@@ -329,12 +333,12 @@ func downloadCommand() error {
 	fmt.Printf("Downloading file: %v\n", filename)
 	fmt.Printf("Output file: %v\n", outFilename)
 
-	mf, err := ParseMetaFile(filename)
+	mf, err := metainfo.ParseMetaFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to parse metafile: %v", err)
 	}
 
-	torrent, err := NewTorrent(mf)
+	torrent, err := torrent.NewTorrent(mf)
 	if err != nil {
 		return fmt.Errorf("failed to create torrent: %v", err)
 	}
@@ -382,19 +386,19 @@ func downloadPieceCommand() error {
 		return fmt.Errorf("failed to parse download piece args: %v", err)
 	}
 
-	mf, err := ParseMetaFile(filename)
+	mf, err := metainfo.ParseMetaFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to parse metafile: %v", err)
 	}
 
-	peersInfo, err := DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
+	peersInfo, err := peer.DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
 	if err != nil {
 		return err
 	}
 
-	peer := peersInfo[0]
+	p := peersInfo[0]
 
-	pc, err := NewPeerConn(peer, mf.Info.Hash)
+	pc, err := peer.NewPeerConn(p, mf.Info.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
@@ -470,8 +474,6 @@ func parseDownloadPieceArgs() (pieceOutFile string, filename string, pieceIdx in
 	return
 }
 
-const handshakeMsgSize = 68
-
 func handshakeCommand() error {
 	if len(os.Args) < 4 {
 		return fmt.Errorf("not enough arguments")
@@ -479,23 +481,23 @@ func handshakeCommand() error {
 
 	filename, peerAddr := os.Args[2], os.Args[3]
 
-	mf, err := ParseMetaFile(filename)
+	mf, err := metainfo.ParseMetaFile(filename)
 	if err != nil {
 		return err
 	}
 
-	peer, err := NewPeerFromAddr(peerAddr)
+	p, err := peer.NewPeerFromAddr(peerAddr)
 	if err != nil {
 		return fmt.Errorf("failed to create peer: %v", err)
 	}
 
-	pc, err := NewPeerConn(*peer, mf.Info.Hash)
+	pc, err := peer.NewPeerConn(*p, mf.Info.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to create peer connection: %v", err)
 	}
 	defer pc.Close()
 
-	fmt.Printf("Peer ID: %x\n", pc.id)
+	fmt.Printf("Peer ID: %x\n", pc.ID())
 
 	return nil
 }
@@ -517,7 +519,7 @@ func decodeCommand() error {
 func infoCommand() error {
 	filename := os.Args[2]
 
-	mf, err := ParseMetaFile(filename)
+	mf, err := metainfo.ParseMetaFile(filename)
 	if err != nil {
 		return err
 	}
@@ -534,12 +536,12 @@ func infoCommand() error {
 func peersCommand() error {
 	filename := os.Args[2]
 
-	mf, err := ParseMetaFile(filename)
+	mf, err := metainfo.ParseMetaFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to parse metafile: %v", err)
 	}
 
-	peersInfo, err := DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
+	peersInfo, err := peer.DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
 	if err != nil {
 		return err
 	}

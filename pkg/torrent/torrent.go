@@ -1,4 +1,4 @@
-package main
+package torrent
 
 import (
 	"fmt"
@@ -6,16 +6,19 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/metainfo"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/peer"
 )
 
 type Torrent struct {
-	mf        *MetaFile
+	mf        *metainfo.MetaFile
 	workQueue chan *PieceWork
-	peerConns []*PeerConn
+	peerConns []*peer.PeerConn
 }
 
-func NewTorrent(mf *MetaFile) (*Torrent, error) {
-	peersInfo, err := DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
+func NewTorrent(mf *metainfo.MetaFile) (*Torrent, error) {
+	peersInfo, err := peer.DiscoverPeers(mf.Announce, mf.Info.Hash, mf.Info.Length)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover peers: %v", err)
 	}
@@ -23,7 +26,7 @@ func NewTorrent(mf *MetaFile) (*Torrent, error) {
 	t := &Torrent{
 		mf,
 		make(chan *PieceWork, len(mf.Info.PieceHashes)),
-		make([]*PeerConn, 0, len(peersInfo)),
+		make([]*peer.PeerConn, 0, len(peersInfo)),
 	}
 
 	if err := t.connectPeers(peersInfo); err != nil {
@@ -33,7 +36,7 @@ func NewTorrent(mf *MetaFile) (*Torrent, error) {
 	return t, nil
 }
 
-func (t *Torrent) addPeerConn(pc *PeerConn) {
+func (t *Torrent) addPeerConn(pc *peer.PeerConn) {
 	t.peerConns = append(t.peerConns, pc)
 }
 
@@ -47,11 +50,11 @@ const PieceDownloadRetries = 5
 // for each peer and performs a handshake with the peer. If the handshake is
 // successful, it adds the PeerConn to the Torrent's peerConns list.
 // If the handshake fails, it returns an error.
-func (t *Torrent) connectPeers(peersInfo []Peer) error {
-	for _, peer := range peersInfo {
-		pc, err := NewPeerConn(peer, t.mf.Info.Hash)
+func (t *Torrent) connectPeers(peersInfo []peer.Peer) error {
+	for _, p := range peersInfo {
+		pc, err := peer.NewPeerConn(p, t.mf.Info.Hash)
 		if err != nil {
-			return fmt.Errorf("failed to create peer %v connection: %v", peer, err)
+			return fmt.Errorf("failed to create peer %v connection: %v", p, err)
 		}
 
 		t.addPeerConn(pc)
@@ -84,8 +87,8 @@ func (t *Torrent) DownloadFile(outFilename string) (err error) {
 	pieces := make([]*Piece, len(pieceHashes))
 
 	// Worker function downloads pieces from peers
-	worker := func(pc *PeerConn) {
-		fmt.Printf("Goroutine for Peer %v started\n", pc.peer)
+	worker := func(pc *peer.PeerConn) {
+		fmt.Printf("Goroutine for Peer %v started\n", pc.Peer)
 
 		if err := pc.PreDownload(); err != nil {
 			errCh <- fmt.Errorf("failed to prepare download: %v", err)
@@ -95,11 +98,11 @@ func (t *Torrent) DownloadFile(outFilename string) (err error) {
 		for pieceWork := range t.workQueue {
 			piece := pieceWork.piece
 
-			log.Printf("Downloading Piece %d from Peer %v\n", piece.idx, pc.peer)
+			log.Printf("Downloading Piece %d from Peer %v\n", piece.idx, pc.Peer)
 
 			piece.data, err = pc.DownloadPiece(t.mf, piece.idx)
 			if err != nil {
-				log.Printf("Attempting to download piece %d from Peer %v failed: %v\n", piece.idx, pc.peer, err)
+				log.Printf("Attempting to download piece %d from Peer %v failed: %v\n", piece.idx, pc.Peer, err)
 
 				if pieceWork.retries < PieceDownloadRetries {
 					log.Printf("Adding piece %d back to work queue\n", piece.idx)
@@ -117,7 +120,7 @@ func (t *Torrent) DownloadFile(outFilename string) (err error) {
 			wg.Done()
 		}
 
-		log.Printf("Goroutine for Peer %v finished\n", pc.peer)
+		log.Printf("Goroutine for Peer %v finished\n", pc.Peer)
 	}
 
 	// Initialize worker for each peer

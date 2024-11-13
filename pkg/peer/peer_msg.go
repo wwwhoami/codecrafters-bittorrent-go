@@ -1,4 +1,4 @@
-package main
+package peer
 
 import (
 	"bufio"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/util"
 )
 
 type MsgID uint8
@@ -190,13 +191,13 @@ const (
 )
 
 type ExtensionPayload struct {
-	payload map[string]any
+	Payload map[string]any
 	// The identifier can refer to a specific extension type
 	id ExtMsgID
 }
 
 func NewExtensionPayload(id ExtMsgID, payload map[string]any) *ExtensionPayload {
-	return &ExtensionPayload{id: id, payload: payload}
+	return &ExtensionPayload{id: id, Payload: payload}
 }
 
 func NewExtensionPayloadFromBytes(data []byte) (*ExtensionPayload, error) {
@@ -209,13 +210,13 @@ func NewExtensionPayloadFromBytes(data []byte) (*ExtensionPayload, error) {
 }
 
 func (e *ExtensionPayload) String() string {
-	return fmt.Sprintf("ExtensionPayload{id: %v, payload: %+v}", e.id, e.payload)
+	return fmt.Sprintf("ExtensionPayload{id: %v, payload: %+v}", e.id, e.Payload)
 }
 
 func (e *ExtensionPayload) MarshalBinary() ([]byte, error) {
-	payload := make([]byte, 0, len(e.payload)+1)
+	payload := make([]byte, 0, len(e.Payload)+1)
 
-	bencodedPayload, err := bencode.BencodeVal(e.payload)
+	bencodedPayload, err := bencode.BencodeVal(e.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bencode extension payload: %v", err)
 	}
@@ -231,7 +232,7 @@ func (e *ExtensionPayload) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("invalid extension payload length")
 	}
 
-	e.payload = make(map[string]any)
+	e.Payload = make(map[string]any)
 
 	e.id = ExtMsgID(data[0])
 
@@ -249,7 +250,7 @@ func (e *ExtensionPayload) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("invalid extension payload")
 	}
 
-	e.payload = decodedPayloadMap
+	e.Payload = decodedPayloadMap
 
 	// If there is any buffered data, it means there is a metadata piece
 	// attached to the extension message
@@ -259,8 +260,67 @@ func (e *ExtensionPayload) UnmarshalBinary(data []byte) error {
 			return fmt.Errorf("failed to decode extension payload: %v", err)
 		}
 
-		e.payload["meta_piece"] = metaPiece
+		e.Payload["meta_piece"] = metaPiece
 	}
+
+	return nil
+}
+
+const handshakeMsgSize = 68
+
+type HandshakeMsg struct {
+	InfoHash      string
+	PeerId        string
+	ReservedBytes [8]byte
+}
+
+func NewHandshakeMsg(infoHash string, reservedBytes *[8]byte) (*HandshakeMsg, error) {
+	peerId, err := util.GenRandStr(20)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate peer ID: %v", err)
+	}
+
+	if reservedBytes == nil {
+		reservedBytes = new([8]byte)
+	}
+
+	return &HandshakeMsg{
+		InfoHash:      infoHash,
+		ReservedBytes: *reservedBytes,
+		PeerId:        peerId,
+	}, nil
+}
+
+func NewHandshakeMsgFromBytes(data []byte) (*HandshakeMsg, error) {
+	handshakeMsg := &HandshakeMsg{}
+	if err := handshakeMsg.Unmarshal(data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal handshake message: %v", err)
+	}
+
+	return handshakeMsg, nil
+}
+
+func (h *HandshakeMsg) Marshal() []byte {
+	handshakeMsg := make([]byte, 0, handshakeMsgSize)
+	handshakeMsg = append(handshakeMsg, 19)
+	handshakeMsg = append(handshakeMsg, []byte("BitTorrent protocol")...)
+	handshakeMsg = append(handshakeMsg, h.ReservedBytes[:]...)
+	handshakeMsg = append(handshakeMsg, h.InfoHash...)
+	handshakeMsg = append(handshakeMsg, h.PeerId...)
+
+	return handshakeMsg
+}
+
+func (h *HandshakeMsg) Unmarshal(data []byte) error {
+	if len(data) != handshakeMsgSize {
+		return fmt.Errorf("invalid handshake message size")
+	}
+
+	h.InfoHash = string(data[28:48])
+
+	copy(h.ReservedBytes[:], data[20:28])
+
+	h.PeerId = string(data[48:68])
 
 	return nil
 }

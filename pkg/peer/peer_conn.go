@@ -1,4 +1,4 @@
-package main
+package peer
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"math"
 	"net"
 	"time"
+
+	metainfo "github.com/codecrafters-io/bittorrent-starter-go/pkg/metainfo"
 )
 
 const (
@@ -24,7 +26,7 @@ type PeerConn struct {
 	conn        net.Conn
 	extensionID *uint8
 	id          string
-	peer        Peer
+	Peer        Peer
 }
 
 // NewPeerConn creates a new connection to the peer and performs the handshake
@@ -37,7 +39,7 @@ func NewPeerConn(peer Peer, infoHash string) (*PeerConn, error) {
 
 	pc := &PeerConn{
 		conn: conn,
-		peer: peer,
+		Peer: peer,
 	}
 
 	pc.id, err = pc.handshake(infoHash, nil)
@@ -59,7 +61,7 @@ func NewPeerConnWithExtension(peer Peer, infoHash string) (*PeerConn, error) {
 
 	pc := &PeerConn{
 		conn: conn,
-		peer: peer,
+		Peer: peer,
 	}
 
 	// Set 20th bit from right to 1 to indicate that we support the extension protocol
@@ -134,7 +136,7 @@ func (pc *PeerConn) PreDownload() error {
 }
 
 // DownloadPiece downloads a complete piece using the pipeline
-func (pc *PeerConn) DownloadPiece(mf *MetaFile, pieceIdx int) ([]byte, error) {
+func (pc *PeerConn) DownloadPiece(mf *metainfo.MetaFile, pieceIdx int) ([]byte, error) {
 	startTime := time.Now()
 
 	pieceLength := mf.Info.PieceLength
@@ -211,11 +213,16 @@ func (pc *PeerConn) DownloadPiece(mf *MetaFile, pieceIdx int) ([]byte, error) {
 		}
 	}
 
-	log.Printf("Piece %d downloaded from %s in %.3fs\n", pieceIdx, pc.peer, time.Since(startTime).Seconds())
+	log.Printf("Piece %d downloaded from %s in %.3fs\n", pieceIdx, pc.Peer, time.Since(startTime).Seconds())
 
 	expectedHash := mf.Info.PieceHashes[pieceIdx]
 
 	return pieceData, verifyPiece(pieceData, expectedHash)
+}
+
+// ID returns the peer connection ID
+func (pc *PeerConn) ID() string {
+	return pc.id
 }
 
 // ExtensionID returns the extension ID of the peer connection if it was
@@ -245,13 +252,13 @@ func verifyPiece(got []byte, expected string) error {
 // received in the handshake response message. The reservedBytes parameter
 // is optional and can be used to set the reserved bytes in the handshake message.
 func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID string, err error) {
-	handshakeMsg, err := HandshakeMsg(infoHash, reservedBytes)
+	handshakeMsg, err := NewHandshakeMsg(infoHash, reservedBytes)
 	if err != nil {
 		err = fmt.Errorf("failed to create handshake message: %v", err)
 		return
 	}
 
-	if err = sendHandshake(pc.conn, handshakeMsg); err != nil {
+	if err = sendHandshake(pc.conn, handshakeMsg.Marshal()); err != nil {
 		err = fmt.Errorf("failed to send handshake message: %v", err)
 		return
 	}
@@ -262,11 +269,17 @@ func (pc *PeerConn) handshake(infoHash string, reservedBytes *[8]byte) (peerID s
 		return
 	}
 
-	peerID = string(rcvHandshake[48:])
+	handshakeResp, err := NewHandshakeMsgFromBytes(rcvHandshake)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal handshake response: %v", err)
+		return
+	}
+
+	peerID = string(handshakeResp.PeerId)
 
 	log.Printf("Handshake successful with peer ID: %x\n", peerID)
 
-	reserved := rcvHandshake[20:28]
+	reserved := handshakeResp.ReservedBytes
 
 	// Check if the peer supports the extension protocol
 	// (if the 20th bit of reserved bytes response and arg from the right is set to 1)
@@ -319,7 +332,7 @@ func (pc *PeerConn) extensionHandshake() (peerExtID uint8, err error) {
 		return
 	}
 
-	utMetadata, ok := resPayload.payload["m"].(map[string]any)["ut_metadata"].(int)
+	utMetadata, ok := resPayload.Payload["m"].(map[string]any)["ut_metadata"].(int)
 	if !ok {
 		err = fmt.Errorf("missing ut_metadata extension in handshake response")
 		return

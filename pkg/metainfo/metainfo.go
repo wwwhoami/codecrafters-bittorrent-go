@@ -1,4 +1,4 @@
-package main
+package metainfo
 
 import (
 	"crypto/sha1"
@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/codecrafters-io/bittorrent-starter-go/pkg/bencode"
+	"github.com/codecrafters-io/bittorrent-starter-go/pkg/util"
 )
 
 // MetaInfo represents the metadata information of a torrent file.
@@ -23,16 +24,16 @@ type MetaInfo struct {
 func NewMetaInfoFromMap(m map[string]any) (mi *MetaInfo, err error) {
 	mi = new(MetaInfo)
 
-	if mi.Name, err = getStringFromMap(m, "name"); err != nil {
+	if mi.Name, err = util.GetStringFromMap(m, "name"); err != nil {
 		return
 	}
-	if mi.Pieces, err = getStringOrBytesFromMap(m, "pieces"); err != nil {
+	if mi.Pieces, err = util.GetStringOrBytesFromMap(m, "pieces"); err != nil {
 		return
 	}
-	if mi.Length, err = getIntFromMap(m, "length"); err != nil {
+	if mi.Length, err = util.GetIntFromMap(m, "length"); err != nil {
 		return
 	}
-	if mi.PieceLength, err = getIntFromMap(m, "piece length"); err != nil {
+	if mi.PieceLength, err = util.GetIntFromMap(m, "piece length"); err != nil {
 		return
 	}
 
@@ -134,51 +135,4 @@ func ParseMetaFile(filename string) (*MetaFile, error) {
 	metafile, err := NewMetaFileFromMap(decodedMap)
 
 	return metafile, err
-}
-
-// HandshakeMsg creates a handshake message for the torrent.
-func HandshakeMsg(infoHash string, reservedBytes *[8]byte) ([]byte, error) {
-	peerId, err := GenRandStr(20)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate peer ID: %v", err)
-	}
-
-	if reservedBytes == nil {
-		reservedBytes = new([8]byte)
-	}
-
-	handshakeMsg := make([]byte, 0, handshakeMsgSize)
-	handshakeMsg = append(handshakeMsg, 19)
-	handshakeMsg = append(handshakeMsg, []byte("BitTorrent protocol")...)
-	handshakeMsg = append(handshakeMsg, reservedBytes[:]...)
-	handshakeMsg = append(handshakeMsg, infoHash...)
-	handshakeMsg = append(handshakeMsg, peerId...)
-
-	return handshakeMsg, nil
-}
-
-// getStringFromMap returns a string value from a map.
-func getStringFromMap(m map[string]any, key string) (string, error) {
-	if value, ok := m[key].(string); ok {
-		return value, nil
-	}
-	return "", fmt.Errorf("invalid %s", key)
-}
-
-// getStringOrBytesFromMap returns a string or bytes value from a map.
-func getStringOrBytesFromMap(m map[string]any, key string) (string, error) {
-	if value, ok := m[key].(string); ok {
-		return value, nil
-	} else if value, ok := m[key].([]byte); ok {
-		return string(value), nil
-	}
-	return "", fmt.Errorf("invalid %s", key)
-}
-
-// getIntFromMap returns an int value from a map.
-func getIntFromMap(m map[string]any, key string) (int, error) {
-	if value, ok := m[key].(int); ok {
-		return value, nil
-	}
-	return 0, fmt.Errorf("invalid %s", key)
 }
